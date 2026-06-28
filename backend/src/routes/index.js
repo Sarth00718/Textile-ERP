@@ -1,0 +1,66 @@
+const express = require('express');
+const authRoutes = require('./auth.routes');
+const departmentRoutes = require('./department.routes');
+const employeeRoutes = require('./employee.routes');
+const attendanceRoutes = require('./attendance.routes');
+const leaveRoutes = require('./leave.routes');
+const payrollRoutes = require('./payroll.routes');
+const factorySettingsRoutes = require('./factorySettings.routes');
+const machineRoutes = require('./machine.routes');
+const machineOpsRoutes = require('./machineOps.routes');
+const beamRoutes = require('./beam.routes');
+const fabricDesignRoutes = require('./fabricDesign.routes');
+const productionRoutes = require('./production.routes');
+const fabricRollRoutes = require('./fabricRoll.routes');
+const inventoryRoutes = require('./inventory.routes');
+const rawMaterialConsumptionRoutes = require('./rawMaterialConsumption.routes');
+const supplierRoutes = require('./supplier.routes');
+const purchaseOrderRoutes = require('./purchaseOrder.routes');
+const customerRoutes = require('./customer.routes');
+const salesOrderRoutes = require('./salesOrder.routes');
+const qualityControlRoutes = require('./qualityControl.routes');
+const packingRoutes = require('./packing.routes');
+const vehicleRoutes = require('./vehicle.routes');
+const dispatchRoutes = require('./dispatch.routes');
+const expenseRoutes = require('./expense.routes');
+const operationsRoutes = require('./operations.routes');
+const notificationRoutes = require('./notification.routes');
+const auditLogRoutes = require('./auditLog.routes');
+const dashboardRoutes = require('./dashboard.routes');
+
+const router = express.Router();
+
+router.use('/auth', authRoutes);
+router.use('/departments', departmentRoutes);
+router.use('/employees', employeeRoutes);
+router.use('/attendance', attendanceRoutes);
+router.use('/leave', leaveRoutes);
+router.use('/payroll', payrollRoutes);
+router.use('/factory-settings', factorySettingsRoutes);
+router.use('/machines', machineRoutes);
+router.use('/machine-ops', machineOpsRoutes);
+router.use('/beams', beamRoutes);
+router.use('/fabric-designs', fabricDesignRoutes);
+router.use('/production', productionRoutes);
+router.use('/fabric-rolls', fabricRollRoutes);
+router.use('/inventory', inventoryRoutes);
+router.use('/raw-material-consumption', rawMaterialConsumptionRoutes);
+router.use('/suppliers', supplierRoutes);
+router.use('/purchase-orders', purchaseOrderRoutes);
+router.use('/customers', customerRoutes);
+router.use('/sales-orders', salesOrderRoutes);
+router.use('/quality-control', qualityControlRoutes);
+router.use('/packing', packingRoutes);
+router.use('/vehicles', vehicleRoutes);
+router.use('/dispatch', dispatchRoutes);
+router.use('/expenses', expenseRoutes);
+router.use('/operations', operationsRoutes);
+router.use('/notifications', notificationRoutes);
+router.use('/audit-logs', auditLogRoutes);
+router.use('/dashboard', dashboardRoutes);
+
+router.get('/health', (req, res) => {
+  res.json({ success: true, message: 'Textile ERP API is running', timestamp: new Date().toISOString() });
+});
+
+module.exports = router;

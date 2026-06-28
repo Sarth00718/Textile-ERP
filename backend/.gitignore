@@ -1,0 +1,30 @@
+# Node modules
+node_modules/
+**/node_modules/
+
+# Env files
+.env
+.env.*
+.env.local
+
+# Logs
+logs/
+*.log
+
+# Build outputs
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Backup of nested git (created during conversion)
+/backend/.git_backup/
+
+# Package lock (keep, but ignore other lock files if needed)
+# npm: package-lock.json (committed usually)
