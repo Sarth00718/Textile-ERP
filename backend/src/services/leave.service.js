@@ -4,6 +4,7 @@ const { ApiError } = require('../utils/apiError');
 const { getPagination, buildMeta } = require('../utils/queryHelpers');
 const { withTransaction } = require('../config/db');
 const { notifyRoles } = require('./notification.service');
+const payrollService = require('./payroll.service');
 
 function countDaysInclusive(startDate, endDate) {
   const start = new Date(startDate);
@@ -29,6 +30,10 @@ async function createLeaveRequest(data) {
     throw ApiError.badRequest('endDate cannot be before startDate');
   }
   const totalDays = countDaysInclusive(data.startDate, data.endDate);
+  const overlaps = await repo.findOverlappingRequests(data.employeeId, data.startDate, data.endDate);
+  if (overlaps.length) {
+    throw ApiError.conflict('Leave request overlaps with an existing pending or approved leave');
+  }
   return repo.create({ ...data, totalDays });
 }
 
@@ -46,16 +51,51 @@ async function approveLeaveRequest(id, approverId) {
     throw ApiError.conflict(`Leave request is already ${existing.status.toLowerCase()}`);
   }
 
+  const overlaps = await repo.findOverlappingRequests(existing.employee_id, existing.start_date, existing.end_date, existing.id);
+  if (overlaps.length) {
+    throw ApiError.conflict('Leave request overlaps with an existing pending or approved leave');
+  }
+
   const result = await withTransaction(async (client) => {
     const updated = await repo.updateStatus(id, 'APPROVED', approverId, null, client);
     const dates = await repo.getDateRange(existing.start_date, existing.end_date);
+    const previousAttendanceRows = await Promise.all(
+      dates.map((date) => attendanceRepo.findByEmployeeAndDate(existing.employee_id, date, client))
+    );
+
     for (const date of dates) {
+      const previousRow = previousAttendanceRows.find((row) => row && row.attendance_date === date) || null;
+      const leaveSnapshot = previousRow
+        ? {
+            status: previousRow.status,
+            checkIn: previousRow.check_in,
+            checkOut: previousRow.check_out,
+            shiftName: previousRow.shift_name,
+            hoursWorked: previousRow.hours_worked,
+            overtimeHours: previousRow.overtime_hours,
+            remarks: previousRow.remarks,
+          }
+        : null;
+
       await attendanceRepo.upsert(
-        { employeeId: existing.employee_id, attendanceDate: date, status: 'ON_LEAVE' },
+        {
+          employeeId: existing.employee_id,
+          attendanceDate: date,
+          status: 'ON_LEAVE',
+          leaveRequestId: updated.id,
+          leaveSnapshot,
+        },
         approverId,
         client
       );
     }
+
+    await payrollService.recalculatePayrollForPeriods(
+      payrollService.collectAffectedPeriods(existing.start_date, existing.end_date),
+      approverId,
+      client
+    );
+
     return updated;
   });
 
@@ -82,10 +122,44 @@ async function rejectLeaveRequest(id, approverId, rejectionReason) {
 
 async function cancelLeaveRequest(id) {
   const existing = await getLeaveRequest(id);
-  if (existing.status !== 'PENDING') {
-    throw ApiError.conflict('Only pending leave requests can be cancelled');
+  if (!['PENDING', 'APPROVED'].includes(existing.status)) {
+    throw ApiError.conflict('Only pending or approved leave requests can be cancelled');
   }
-  return repo.cancel(id);
+
+  return withTransaction(async (client) => {
+    if (existing.status === 'APPROVED') {
+      const attendanceRows = await attendanceRepo.findByLeaveRequestId(id, client);
+      for (const row of attendanceRows) {
+        if (row.leave_snapshot) {
+          await attendanceRepo.upsert(
+            {
+              employeeId: row.employee_id,
+              attendanceDate: row.attendance_date,
+              status: row.leave_snapshot.status,
+              checkIn: row.leave_snapshot.checkIn,
+              checkOut: row.leave_snapshot.checkOut,
+              shiftName: row.leave_snapshot.shiftName,
+              hoursWorked: row.leave_snapshot.hoursWorked,
+              overtimeHours: row.leave_snapshot.overtimeHours,
+              remarks: row.leave_snapshot.remarks,
+            },
+            row.marked_by,
+            client
+          );
+        } else {
+          await attendanceRepo.remove(row.id, client);
+        }
+      }
+
+      await payrollService.recalculatePayrollForPeriods(
+        payrollService.collectAffectedPeriods(existing.start_date, existing.end_date),
+        existing.approved_by || null,
+        client
+      );
+    }
+
+    return repo.cancel(id, client);
+  });
 }
 
 module.exports = {

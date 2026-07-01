@@ -3,6 +3,10 @@ const { safeSortColumn, safeSortDirection } = require('../utils/queryHelpers');
 
 const SORTABLE = ['attendance_date', 'created_at'];
 
+function getExecutor(client) {
+  return client || { query };
+}
+
 async function list({ search, employeeId, departmentId, status, startDate, endDate, sortBy, sortDir, limit, offset }) {
   const conditions = [];
   const params = [];
@@ -60,8 +64,9 @@ async function list({ search, employeeId, departmentId, status, startDate, endDa
   return { rows, total };
 }
 
-async function findById(id) {
-  const { rows } = await query(
+async function findById(id, client = null) {
+  const executor = getExecutor(client);
+  const { rows } = await executor.query(
     `SELECT a.*, e.full_name AS employee_name, e.employee_code FROM attendance a
      JOIN employees e ON e.id = a.employee_id WHERE a.id = $1`,
     [id]
@@ -69,20 +74,22 @@ async function findById(id) {
   return rows[0] || null;
 }
 
-async function findByEmployeeAndDate(employeeId, date) {
-  const { rows } = await query('SELECT * FROM attendance WHERE employee_id = $1 AND attendance_date = $2', [employeeId, date]);
+async function findByEmployeeAndDate(employeeId, date, client = null) {
+  const executor = getExecutor(client);
+  const { rows } = await executor.query('SELECT * FROM attendance WHERE employee_id = $1 AND attendance_date = $2', [employeeId, date]);
   return rows[0] || null;
 }
 
 async function upsert(data, userId, client = null) {
-  const executor = client || { query };
+  const executor = getExecutor(client);
   const { rows } = await executor.query(
-    `INSERT INTO attendance (employee_id, attendance_date, status, check_in, check_out, shift_name, hours_worked, overtime_hours, remarks, marked_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+    `INSERT INTO attendance (employee_id, attendance_date, status, check_in, check_out, shift_name, hours_worked, overtime_hours, remarks, marked_by, leave_request_id, leave_snapshot)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
      ON CONFLICT (employee_id, attendance_date)
      DO UPDATE SET status = EXCLUDED.status, check_in = EXCLUDED.check_in, check_out = EXCLUDED.check_out,
        shift_name = EXCLUDED.shift_name, hours_worked = EXCLUDED.hours_worked, overtime_hours = EXCLUDED.overtime_hours,
-       remarks = EXCLUDED.remarks, marked_by = EXCLUDED.marked_by, updated_at = NOW()
+       remarks = EXCLUDED.remarks, marked_by = EXCLUDED.marked_by,
+       leave_request_id = EXCLUDED.leave_request_id, leave_snapshot = EXCLUDED.leave_snapshot, updated_at = NOW()
      RETURNING *`,
     [
       data.employeeId,
@@ -95,6 +102,8 @@ async function upsert(data, userId, client = null) {
       data.overtimeHours || 0,
       data.remarks || null,
       userId,
+      data.leaveRequestId || null,
+      data.leaveSnapshot || null,
     ]
   );
   return rows[0];
@@ -125,12 +134,23 @@ async function update(id, data) {
   return rows[0] || null;
 }
 
-async function remove(id) {
-  await query('DELETE FROM attendance WHERE id = $1', [id]);
+async function remove(id, client = null) {
+  const executor = getExecutor(client);
+  await executor.query('DELETE FROM attendance WHERE id = $1', [id]);
 }
 
-async function getSummaryForPeriod(employeeId, startDate, endDate) {
-  const { rows } = await query(
+async function findByLeaveRequestId(leaveRequestId, client = null) {
+  const executor = getExecutor(client);
+  const { rows } = await executor.query(
+    'SELECT * FROM attendance WHERE leave_request_id = $1 ORDER BY attendance_date ASC',
+    [leaveRequestId]
+  );
+  return rows;
+}
+
+async function getSummaryForPeriod(employeeId, startDate, endDate, client = null) {
+  const executor = getExecutor(client);
+  const { rows } = await executor.query(
     `SELECT
        COUNT(*) FILTER (WHERE status = 'PRESENT') AS days_present,
        COUNT(*) FILTER (WHERE status = 'ABSENT') AS days_absent,
@@ -144,4 +164,4 @@ async function getSummaryForPeriod(employeeId, startDate, endDate) {
   return rows[0];
 }
 
-module.exports = { list, findById, findByEmployeeAndDate, upsert, update, remove, getSummaryForPeriod };
+module.exports = { list, findById, findByEmployeeAndDate, upsert, update, remove, findByLeaveRequestId, getSummaryForPeriod };

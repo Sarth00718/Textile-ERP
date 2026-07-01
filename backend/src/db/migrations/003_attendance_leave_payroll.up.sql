@@ -39,6 +39,16 @@ CREATE TABLE leave_requests (
 CREATE INDEX idx_leave_employee ON leave_requests(employee_id);
 CREATE INDEX idx_leave_status ON leave_requests(status);
 
+ALTER TABLE attendance
+  ADD COLUMN leave_request_id UUID,
+  ADD COLUMN leave_snapshot JSONB;
+
+ALTER TABLE attendance
+  ADD CONSTRAINT fk_attendance_leave_request
+  FOREIGN KEY (leave_request_id) REFERENCES leave_requests(id) ON DELETE SET NULL;
+
+CREATE INDEX idx_attendance_leave_request ON attendance(leave_request_id);
+
 CREATE TABLE payroll_runs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   period_month SMALLINT NOT NULL CHECK (period_month BETWEEN 1 AND 12),

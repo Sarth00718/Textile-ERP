@@ -3,6 +3,10 @@ const { safeSortColumn, safeSortDirection } = require('../utils/queryHelpers');
 
 const SORTABLE = ['start_date', 'created_at', 'status'];
 
+function getExecutor(client) {
+  return client || { query };
+}
+
 async function list({ employeeId, status, leaveType, sortBy, sortDir, limit, offset }) {
   const conditions = [];
   const params = [];
@@ -40,8 +44,9 @@ async function list({ employeeId, status, leaveType, sortBy, sortDir, limit, off
   return { rows, total };
 }
 
-async function findById(id) {
-  const { rows } = await query(
+async function findById(id, client = null) {
+  const executor = getExecutor(client);
+  const { rows } = await executor.query(
     `SELECT l.*, e.full_name AS employee_name, e.employee_code FROM leave_requests l
      JOIN employees e ON e.id = l.employee_id WHERE l.id = $1`,
     [id]
@@ -59,7 +64,7 @@ async function create(data) {
 }
 
 async function updateStatus(id, status, approvedBy, rejectionReason, client = null) {
-  const executor = client || { query };
+  const executor = getExecutor(client);
   const { rows } = await executor.query(
     `UPDATE leave_requests SET status = $1, approved_by = $2, approved_at = NOW(), rejection_reason = $3, updated_at = NOW()
      WHERE id = $4 RETURNING *`,
@@ -68,12 +73,34 @@ async function updateStatus(id, status, approvedBy, rejectionReason, client = nu
   return rows[0];
 }
 
-async function cancel(id) {
-  const { rows } = await query(
+async function cancel(id, client = null) {
+  const executor = getExecutor(client);
+  const { rows } = await executor.query(
     `UPDATE leave_requests SET status = 'CANCELLED', updated_at = NOW() WHERE id = $1 RETURNING *`,
     [id]
   );
   return rows[0];
+}
+
+async function findOverlappingRequests(employeeId, startDate, endDate, excludeId = null, client = null) {
+  const executor = getExecutor(client);
+  const params = [employeeId, startDate, endDate];
+  let sql =
+    `SELECT l.*, e.full_name AS employee_name, e.employee_code
+     FROM leave_requests l
+     JOIN employees e ON e.id = l.employee_id
+     WHERE l.employee_id = $1
+       AND l.start_date <= $3
+       AND l.end_date >= $2
+       AND l.status IN ('PENDING', 'APPROVED')`;
+
+  if (excludeId) {
+    params.push(excludeId);
+    sql += ` AND l.id <> $4`;
+  }
+
+  const { rows } = await executor.query(sql, params);
+  return rows;
 }
 
 async function getDateRange(startDate, endDate) {
@@ -86,4 +113,4 @@ async function getDateRange(startDate, endDate) {
   return dates;
 }
 
-module.exports = { list, findById, create, updateStatus, cancel, getDateRange };
+module.exports = { list, findById, create, updateStatus, cancel, findOverlappingRequests, getDateRange };

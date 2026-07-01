@@ -1,16 +1,23 @@
 const { query } = require('../config/db');
 
-async function findRunByPeriod(month, year) {
-  const { rows } = await query('SELECT * FROM payroll_runs WHERE period_month = $1 AND period_year = $2', [month, year]);
+function getExecutor(client) {
+  return client || { query };
+}
+
+async function findRunByPeriod(month, year, client = null) {
+  const executor = getExecutor(client);
+  const { rows } = await executor.query('SELECT * FROM payroll_runs WHERE period_month = $1 AND period_year = $2', [month, year]);
   return rows[0] || null;
 }
 
-async function findRunById(id) {
-  const { rows } = await query('SELECT * FROM payroll_runs WHERE id = $1', [id]);
+async function findRunById(id, client = null) {
+  const executor = getExecutor(client);
+  const { rows } = await executor.query('SELECT * FROM payroll_runs WHERE id = $1', [id]);
   return rows[0] || null;
 }
 
-async function listRuns({ status, periodMonth, periodYear, limit, offset }) {
+async function listRuns({ status, periodMonth, periodYear, limit, offset }, client = null) {
+  const executor = getExecutor(client);
   const conditions = [];
   const params = [];
   if (status) {
@@ -27,17 +34,17 @@ async function listRuns({ status, periodMonth, periodYear, limit, offset }) {
   }
   const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
-  const countRes = await query(`SELECT COUNT(*) FROM payroll_runs ${whereClause}`, params);
+  const countRes = await executor.query(`SELECT COUNT(*) FROM payroll_runs ${whereClause}`, params);
   const total = parseInt(countRes.rows[0].count, 10);
 
   const baseQuery = `SELECT * FROM payroll_runs ${whereClause} ORDER BY period_year DESC, period_month DESC`;
   if (limit === undefined) {
-    const { rows } = await query(baseQuery, params);
+    const { rows } = await executor.query(baseQuery, params);
     return { rows, total };
   }
 
   params.push(limit, offset);
-  const { rows } = await query(`${baseQuery} LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
+  const { rows } = await executor.query(`${baseQuery} LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
   return { rows, total };
 }
 
@@ -62,8 +69,9 @@ async function setRunStatus(id, status, totalAmount, client) {
   return rows[0];
 }
 
-async function listActiveEmployeesWithRange() {
-  const { rows } = await query(
+async function listActiveEmployeesWithRange(client = null) {
+  const executor = getExecutor(client);
+  const { rows } = await executor.query(
     `SELECT * FROM employees WHERE employment_status = 'ACTIVE'`
   );
   return rows;
@@ -92,8 +100,9 @@ async function insertItem(item, client) {
   return rows[0];
 }
 
-async function listItemsByRun(runId) {
-  const { rows } = await query(
+async function listItemsByRun(runId, client = null) {
+  const executor = getExecutor(client);
+  const { rows } = await executor.query(
     `SELECT pi.*, e.full_name AS employee_name, e.employee_code, e.department_id, d.name AS department_name
      FROM payroll_items pi
      JOIN employees e ON e.id = pi.employee_id
@@ -106,7 +115,7 @@ async function listItemsByRun(runId) {
 }
 
 async function markItemsPaid(runId, client) {
-  const executor = client || { query };
+  const executor = getExecutor(client);
   await executor.query(`UPDATE payroll_items SET status = 'PAID', paid_at = NOW() WHERE payroll_run_id = $1`, [runId]);
 }
 
