@@ -107,6 +107,7 @@ export default function DepartmentsPage() {
         onPageChange={table.setPage}
         onSearch={table.handleSearch}
         searchPlaceholder="Search departments…"
+        onExport={(fmt) => departmentApi.download(fmt, { search: table.search })}
       />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Department' : 'New Department'}>

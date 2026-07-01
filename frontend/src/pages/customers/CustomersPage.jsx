@@ -97,7 +97,7 @@ export default function CustomersPage() {
 
       <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage}
         onSearch={table.handleSearch} searchPlaceholder="Search customers…"
-        onExport={(fmt) => window.open(customerApi.exportUrl(fmt))}
+        onExport={(fmt) => customerApi.download(fmt, { search: table.search })}
       />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Customer' : 'Add Customer'}>

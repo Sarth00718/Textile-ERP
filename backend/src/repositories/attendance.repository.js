@@ -3,10 +3,14 @@ const { safeSortColumn, safeSortDirection } = require('../utils/queryHelpers');
 
 const SORTABLE = ['attendance_date', 'created_at'];
 
-async function list({ employeeId, departmentId, status, startDate, endDate, sortBy, sortDir, limit, offset }) {
+async function list({ search, employeeId, departmentId, status, startDate, endDate, sortBy, sortDir, limit, offset }) {
   const conditions = [];
   const params = [];
 
+  if (search) {
+    params.push(`%${search}%`);
+    conditions.push(`(e.full_name ILIKE $${params.length} OR e.employee_code ILIKE $${params.length})`);
+  }
   if (employeeId) {
     params.push(employeeId);
     conditions.push(`a.employee_id = $${params.length}`);
@@ -39,9 +43,10 @@ async function list({ employeeId, departmentId, status, startDate, endDate, sort
   const total = parseInt(countRes.rows[0].count, 10);
 
   const baseQuery = `
-    SELECT a.*, e.full_name AS employee_name, e.employee_code, e.department_id
+    SELECT a.*, e.full_name AS employee_name, e.employee_code, e.department_id, d.name AS department_name
     FROM attendance a
     JOIN employees e ON e.id = a.employee_id
+    LEFT JOIN departments d ON d.id = e.department_id
     ${whereClause}
     ORDER BY a.${sortCol} ${sortDirection}, e.full_name ASC`;
 

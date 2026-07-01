@@ -61,7 +61,7 @@ export default function ElectricityPage() {
         action={can('electricityMonitoring', 'manage') && <Button onClick={() => { reset({ readingDate: new Date().toISOString().slice(0, 10) }); setModalOpen(true); }}><PlusIcon className="h-4 w-4" /> Log Reading</Button>} />
 
       <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage}
-        onExport={(fmt) => window.open(electricityApi.list ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'}/operations/electricity?format=${fmt}` : undefined)}
+        onExport={(fmt) => electricityApi.download(fmt, {})}
       />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Log Electricity Reading">

@@ -97,7 +97,8 @@ export default function PurchaseOrdersPage() {
       <PageHeader title="Purchase Orders" description="Procurement from suppliers — receiving goods updates inventory automatically"
         action={can('purchaseOrders', 'manage') && <Button onClick={openCreate}><PlusIcon className="h-4 w-4" /> New Purchase Order</Button>} />
 
-      <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage} onRowClick={viewPO} />
+      <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage} onRowClick={viewPO}
+        onExport={(fmt) => purchaseOrderApi.download(fmt, { ...table.filters })} />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="New Purchase Order" maxWidth="max-w-2xl">
         <form onSubmit={handleSubmit(onSubmit)}>

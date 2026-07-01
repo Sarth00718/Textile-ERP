@@ -125,7 +125,7 @@ export default function EmployeesPage() {
         onPageChange={table.setPage}
         onSearch={table.handleSearch}
         searchPlaceholder="Search employees…"
-        onExport={(fmt) => window.open(employeeApi.exportUrl(fmt, { search: table.search }))}
+        onExport={(fmt) => employeeApi.download(fmt, { search: table.search })}
       />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Employee' : 'Add Employee'} maxWidth="max-w-xl">

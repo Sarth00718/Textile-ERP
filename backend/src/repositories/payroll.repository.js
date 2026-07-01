@@ -10,13 +10,34 @@ async function findRunById(id) {
   return rows[0] || null;
 }
 
-async function listRuns({ limit, offset }) {
-  const countRes = await query('SELECT COUNT(*) FROM payroll_runs');
+async function listRuns({ status, periodMonth, periodYear, limit, offset }) {
+  const conditions = [];
+  const params = [];
+  if (status) {
+    params.push(status);
+    conditions.push(`status = $${params.length}`);
+  }
+  if (periodMonth) {
+    params.push(periodMonth);
+    conditions.push(`period_month = $${params.length}`);
+  }
+  if (periodYear) {
+    params.push(periodYear);
+    conditions.push(`period_year = $${params.length}`);
+  }
+  const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const countRes = await query(`SELECT COUNT(*) FROM payroll_runs ${whereClause}`, params);
   const total = parseInt(countRes.rows[0].count, 10);
-  const { rows } = await query(
-    'SELECT * FROM payroll_runs ORDER BY period_year DESC, period_month DESC LIMIT $1 OFFSET $2',
-    [limit, offset]
-  );
+
+  const baseQuery = `SELECT * FROM payroll_runs ${whereClause} ORDER BY period_year DESC, period_month DESC`;
+  if (limit === undefined) {
+    const { rows } = await query(baseQuery, params);
+    return { rows, total };
+  }
+
+  params.push(limit, offset);
+  const { rows } = await query(`${baseQuery} LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
   return { rows, total };
 }
 

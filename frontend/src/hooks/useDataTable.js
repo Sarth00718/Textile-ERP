@@ -11,6 +11,7 @@ export function useDataTable(fetcher, initialFilters = {}) {
   const [items, setItems] = useState([]);
   const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState(initialFilters);
@@ -18,11 +19,15 @@ export function useDataTable(fetcher, initialFilters = {}) {
 
   const load = useCallback(async (overrides = {}) => {
     setLoading(true);
+    setError(null);
     try {
       const params = { page, pageSize: 20, search: search || undefined, ...filters, ...overrides };
       const res = await fetcher(params);
       setItems(res.items || res.data || []);
       setMeta(res.meta || null);
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.message || 'Failed to load data');
+      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -49,7 +54,7 @@ export function useDataTable(fetcher, initialFilters = {}) {
   }
 
   return {
-    items, meta, loading, page, search, filters,
+    items, meta, loading, error, page, search, filters,
     setPage, handleSearch, updateFilters, reload: load,
   };
 }

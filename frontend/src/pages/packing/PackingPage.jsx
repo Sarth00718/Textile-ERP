@@ -62,7 +62,8 @@ export default function PackingPage() {
         action={can('packing', 'manage') && <Button onClick={() => { reset(); setModalOpen(true); }}><PlusIcon className="h-4 w-4" /> Pack a Roll</Button>}
       />
 
-      <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage} />
+      <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage}
+        onExport={(fmt) => packingApi.download(fmt, {})} />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Pack a Roll">
         <form onSubmit={handleSubmit(onSubmit)}>

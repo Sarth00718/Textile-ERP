@@ -80,7 +80,7 @@ export default function DispatchPage() {
       />
 
       <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage} onRowClick={viewDispatch}
-        onExport={(fmt) => window.open(dispatchApi.list ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'}/dispatch?format=${fmt}` : undefined)}
+        onExport={(fmt) => dispatchApi.download(fmt, { ...table.filters })}
       />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="New Dispatch" maxWidth="max-w-xl">

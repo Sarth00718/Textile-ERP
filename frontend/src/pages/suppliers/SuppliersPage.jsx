@@ -94,7 +94,7 @@ export default function SuppliersPage() {
 
       <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage}
         onSearch={table.handleSearch} searchPlaceholder="Search suppliers…"
-        onExport={(fmt) => window.open(supplierApi.exportUrl(fmt))}
+        onExport={(fmt) => supplierApi.download(fmt, { search: table.search })}
       />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Supplier' : 'Add Supplier'}>

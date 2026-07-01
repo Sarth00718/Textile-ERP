@@ -16,7 +16,7 @@ function periodRange(month, year) {
 
 async function listPayrollRuns(reqQuery) {
   const { page, pageSize, offset, limit } = getPagination(reqQuery);
-  const { rows, total } = await repo.listRuns({ limit, offset });
+  const { rows, total } = await repo.listRuns({ ...reqQuery, limit: reqQuery.format ? undefined : limit, offset: reqQuery.format ? undefined : offset });
   return { items: rows, meta: buildMeta(total, page, pageSize) };
 }
 

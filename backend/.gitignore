@@ -23,8 +23,6 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Backup of nested git (created during conversion)
-/backend/.git_backup/
 
 # Package lock (keep, but ignore other lock files if needed)
 # npm: package-lock.json (committed usually)

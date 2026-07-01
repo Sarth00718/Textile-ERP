@@ -78,7 +78,8 @@ export default function BeamAllocationPage() {
         action={can('beamAllocation', 'manage') && <Button onClick={() => { reset(); setModalOpen(true); }}><PlusIcon className="h-4 w-4" /> Allocate Beam</Button>}
       />
 
-      <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage} />
+      <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage}
+        onExport={(fmt) => beamAllocationApi.download(fmt, {})} />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Allocate Beam to Machine">
         <form onSubmit={handleSubmit(onSubmit)}>

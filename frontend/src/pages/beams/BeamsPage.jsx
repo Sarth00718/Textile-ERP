@@ -97,6 +97,7 @@ export default function BeamsPage() {
             <option value="IN_USE">In Use</option><option value="EMPTY">Empty</option><option value="DAMAGED">Damaged</option>
           </select>
         }
+        onExport={(fmt) => beamApi.download(fmt, { ...table.filters, search: table.search })}
       />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Beam' : 'Add Beam'}>

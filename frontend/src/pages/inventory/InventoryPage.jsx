@@ -111,7 +111,7 @@ export default function InventoryPage() {
             {CATEGORIES.map((c) => <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>)}
           </select>
         }
-        onExport={(fmt) => window.open(inventoryApi.exportUrl(fmt))}
+        onExport={(fmt) => inventoryApi.download(fmt, { ...table.filters, search: table.search })}
       />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Item' : 'Add Inventory Item'}>

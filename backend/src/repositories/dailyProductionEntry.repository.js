@@ -1,8 +1,12 @@
 const { query } = require('../config/db');
 
-async function list({ productionOrderId, startDate, endDate, limit, offset }) {
+async function list({ search, productionOrderId, startDate, endDate, limit, offset }) {
   const conditions = [];
   const params = [];
+  if (search) {
+    params.push(`%${search}%`);
+    conditions.push(`(po.production_order_no ILIKE $${params.length} OR m.name ILIKE $${params.length} OR COALESCE(e.full_name, '') ILIKE $${params.length})`);
+  }
   if (productionOrderId) {
     params.push(productionOrderId);
     conditions.push(`dpe.production_order_id = $${params.length}`);
@@ -17,19 +21,30 @@ async function list({ productionOrderId, startDate, endDate, limit, offset }) {
   }
   const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
-  const countRes = await query(`SELECT COUNT(*) FROM daily_production_entries dpe ${whereClause}`, params);
+  const countRes = await query(
+    `SELECT COUNT(*) FROM daily_production_entries dpe
+     JOIN production_orders po ON po.id = dpe.production_order_id
+     JOIN machines m ON m.id = dpe.machine_id
+     LEFT JOIN employees e ON e.id = dpe.operator_id
+     ${whereClause}`,
+    params
+  );
   const total = parseInt(countRes.rows[0].count, 10);
 
-  params.push(limit, offset);
-  const { rows } = await query(
-    `SELECT dpe.*, po.production_order_no, m.name AS machine_name, m.machine_code, e.full_name AS operator_name
+  const baseQuery = `SELECT dpe.*, po.production_order_no, m.name AS machine_name, m.machine_code, e.full_name AS operator_name
      FROM daily_production_entries dpe
      JOIN production_orders po ON po.id = dpe.production_order_id
      JOIN machines m ON m.id = dpe.machine_id
      LEFT JOIN employees e ON e.id = dpe.operator_id
-     ${whereClause} ORDER BY dpe.entry_date DESC, dpe.created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
-    params
-  );
+     ${whereClause} ORDER BY dpe.entry_date DESC, dpe.created_at DESC`;
+
+  if (limit === undefined) {
+    const { rows } = await query(baseQuery, params);
+    return { rows, total };
+  }
+
+  params.push(limit, offset);
+  const { rows } = await query(`${baseQuery} LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
   return { rows, total };
 }
 

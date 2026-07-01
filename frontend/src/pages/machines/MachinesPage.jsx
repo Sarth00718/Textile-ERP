@@ -136,7 +136,7 @@ export default function MachinesPage() {
             <option value="BREAKDOWN">Breakdown</option><option value="MAINTENANCE">Maintenance</option><option value="OFFLINE">Offline</option>
           </select>
         }
-        onExport={(fmt) => window.open(machineApi.exportUrl(fmt))}
+        onExport={(fmt) => machineApi.download(fmt, { ...table.filters, search: table.search })}
       />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Machine' : 'Add Machine'}>

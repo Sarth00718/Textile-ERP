@@ -72,7 +72,8 @@ export default function DailyProductionEntryPage() {
         action={can('dailyProductionEntry', 'manage') && <Button onClick={() => { reset(); setModalOpen(true); }}><PlusIcon className="h-4 w-4" /> Log Production</Button>}
       />
 
-      <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage} />
+      <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage}
+        onExport={(fmt) => dailyProductionEntryApi.download(fmt, {})} />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Log Daily Production" maxWidth="max-w-xl">
         <form onSubmit={handleSubmit(onSubmit)}>

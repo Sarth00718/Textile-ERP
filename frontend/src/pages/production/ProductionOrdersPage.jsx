@@ -74,9 +74,7 @@ export default function ProductionOrdersPage() {
             <option value="COMPLETED">Completed</option><option value="ON_HOLD">On Hold</option><option value="CANCELLED">Cancelled</option>
           </select>
         }
-      />
-
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="New Production Order">
+        onExport={(fmt) => productionOrderApi.download(fmt, { ...table.filters })} onClose={() => setModalOpen(false)} title="New Production Order">
         <form onSubmit={handleSubmit(onSubmit)}>
           <Input label="Production Order No" required register={register} name="productionOrderNo" error={errors.productionOrderNo} />
           <Select label="Work Order" required register={register} name="workOrderId" placeholder="Select work order" error={errors.workOrderId}

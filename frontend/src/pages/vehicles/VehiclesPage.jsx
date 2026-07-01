@@ -86,7 +86,8 @@ export default function VehiclesPage() {
       <PageHeader title="Vehicle Management" description="Fleet for outbound dispatch"
         action={can('vehicles', 'manage') && <Button onClick={openCreate}><PlusIcon className="h-4 w-4" /> Add Vehicle</Button>} />
 
-      <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage} />
+      <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage}
+        onExport={(fmt) => vehicleApi.download(fmt, { ...table.filters })} />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Vehicle' : 'Add Vehicle'}>
         <form onSubmit={handleSubmit(onSubmit)}>

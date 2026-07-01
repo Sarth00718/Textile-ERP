@@ -82,7 +82,8 @@ export default function WorkOrdersPage() {
       <PageHeader title="Work Orders" description="Aggregate production targets, optionally tied to sales orders"
         action={can('workOrders', 'manage') && <Button onClick={() => { reset(); setModalOpen(true); }}><PlusIcon className="h-4 w-4" /> New Work Order</Button>} />
 
-      <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage} />
+      <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage}
+        onExport={(fmt) => workOrderApi.download(fmt, { ...table.filters })} />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="New Work Order">
         <form onSubmit={handleSubmit(onSubmit)}>

@@ -70,7 +70,8 @@ export default function PayrollPage() {
         action={can('payroll', 'manage') && <Button onClick={openGenerate}><PlusIcon className="h-4 w-4" /> Generate Payroll</Button>}
       />
 
-      <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage} onRowClick={viewRun} />
+      <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage} onRowClick={viewRun}
+        onExport={(fmt) => payrollApi.download(fmt, {})} />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Generate Payroll">
         <form onSubmit={handleSubmit(onSubmit)}>

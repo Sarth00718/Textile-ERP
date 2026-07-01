@@ -27,6 +27,7 @@ const operationsRoutes = require('./operations.routes');
 const notificationRoutes = require('./notification.routes');
 const auditLogRoutes = require('./auditLog.routes');
 const dashboardRoutes = require('./dashboard.routes');
+const reportsRoutes = require('./reports.routes');
 
 const router = express.Router();
 
@@ -58,6 +59,7 @@ router.use('/operations', operationsRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/audit-logs', auditLogRoutes);
 router.use('/dashboard', dashboardRoutes);
+router.use('/reports', reportsRoutes);
 
 router.get('/health', (req, res) => {
   res.json({ success: true, message: 'Textile ERP API is running', timestamp: new Date().toISOString() });

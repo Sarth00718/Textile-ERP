@@ -77,6 +77,12 @@ const NAV_SECTIONS = [
     ],
   },
   {
+    title: 'Reports',
+    items: [
+      { label: 'Reports Hub', to: '/reports', icon: ChartBarIcon, module: 'reports' },
+    ],
+  },
+  {
     title: 'System',
     items: [
       { label: 'Notifications', to: '/notifications', icon: BellIcon, module: 'notifications' },

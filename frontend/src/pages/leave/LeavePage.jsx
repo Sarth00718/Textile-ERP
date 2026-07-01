@@ -127,6 +127,7 @@ export default function LeavePage() {
             <option value="CANCELLED">Cancelled</option>
           </select>
         }
+        onExport={(fmt) => leaveApi.download(fmt, { ...table.filters })}
       />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Request Leave">

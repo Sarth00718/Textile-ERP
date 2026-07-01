@@ -93,7 +93,7 @@ export default function AttendancePage() {
             {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         }
-        onExport={(fmt) => window.open(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'}/attendance?format=${fmt}`)}
+        onExport={(fmt) => attendanceApi.download(fmt, { ...table.filters })}
         emptyMessage="No attendance records for the selected filters."
       />
 

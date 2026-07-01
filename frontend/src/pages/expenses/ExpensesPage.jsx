@@ -95,7 +95,7 @@ export default function ExpensesPage() {
             {CATEGORIES.map((c) => <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>)}
           </select>
         }
-        onExport={(fmt) => window.open(expenseApi.exportUrl(fmt))}
+        onExport={(fmt) => expenseApi.download(fmt, { ...table.filters })}
       />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Expense' : 'Add Expense'}>

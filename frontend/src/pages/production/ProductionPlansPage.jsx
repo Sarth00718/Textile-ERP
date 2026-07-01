@@ -100,7 +100,8 @@ export default function ProductionPlansPage() {
       <PageHeader title="Production Planning" description="Forward production plans by fabric design"
         action={can('productionPlanning', 'manage') && <Button onClick={openCreate}><PlusIcon className="h-4 w-4" /> New Plan</Button>} />
 
-      <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage} />
+      <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage}
+        onExport={(fmt) => productionPlanApi.download(fmt, {})} />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Plan' : 'New Production Plan'}>
         <form onSubmit={handleSubmit(onSubmit)}>

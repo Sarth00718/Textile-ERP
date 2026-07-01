@@ -41,7 +41,7 @@ export default function FabricRollsPage() {
             <option value="PACKED">Packed</option><option value="DISPATCHED">Dispatched</option>
           </select>
         }
-        onExport={(fmt) => window.open(fabricRollApi.exportUrl(fmt))}
+        onExport={(fmt) => fabricRollApi.download(fmt, { ...table.filters, search: table.search })}
       />
     </div>
   );

@@ -100,7 +100,8 @@ export default function SalesOrdersPage() {
       <PageHeader title="Sales Orders" description="Customer orders — dispatch automatically updates status and inventory"
         action={can('salesOrders', 'manage') && <Button onClick={openCreate}><PlusIcon className="h-4 w-4" /> New Sales Order</Button>} />
 
-      <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage} onRowClick={viewSO} />
+      <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage} onRowClick={viewSO}
+        onExport={(fmt) => salesOrderApi.download(fmt, { ...table.filters })} />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="New Sales Order" maxWidth="max-w-2xl">
         <form onSubmit={handleSubmit(onSubmit)}>

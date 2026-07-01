@@ -65,4 +65,38 @@ api.interceptors.response.use(
   }
 );
 
+/**
+ * Authenticated file download.
+ * Uses the existing axios instance (which injects the Bearer token via the
+ * request interceptor) to fetch the file as a blob, then triggers a browser
+ * "Save as" download without ever opening a new tab or exposing the URL.
+ *
+ * @param {string} path    - API path, e.g. '/employees'
+ * @param {object} params  - Query params, e.g. { format: 'csv', search: 'foo' }
+ * @param {string} filename - Suggested filename without extension, e.g. 'employees'
+ */
+export async function downloadExport(path, params = {}, filename = 'export') {
+  const response = await api.get(path, { params, responseType: 'blob' });
+
+  // Derive extension from content-type or format param
+  const contentType = response.headers['content-type'] || '';
+  let ext = params.format === 'excel' ? 'xlsx' : (params.format || 'csv');
+  if (contentType.includes('pdf')) ext = 'pdf';
+  else if (contentType.includes('spreadsheet') || contentType.includes('excel')) ext = 'xlsx';
+
+  // Try to use filename from Content-Disposition header if present
+  const disposition = response.headers['content-disposition'] || '';
+  const match = disposition.match(/filename="?([^";]+)"?/i);
+  const finalName = match?.[1] || `${filename}.${ext}`;
+
+  const url = window.URL.createObjectURL(new Blob([response.data], { type: contentType }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = finalName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
 export default api;

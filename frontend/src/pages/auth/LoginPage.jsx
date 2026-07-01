@@ -76,10 +76,6 @@ export default function LoginPage() {
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
-
-        <p className="mt-4 text-center text-xs text-steel-500">
-          Demo: owner@textileerp.com / Owner@12345
-        </p>
       </div>
     </div>
   );

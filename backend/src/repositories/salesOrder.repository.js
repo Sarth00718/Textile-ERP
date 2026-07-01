@@ -20,13 +20,17 @@ async function list({ search, status, customerId, limit, offset }) {
   const countRes = await query(`SELECT COUNT(*) FROM sales_orders so ${whereClause}`, params);
   const total = parseInt(countRes.rows[0].count, 10);
 
-  params.push(limit, offset);
-  const { rows } = await query(
-    `SELECT so.*, c.name AS customer_name, c.customer_code
+  const baseQuery = `SELECT so.*, c.name AS customer_name, c.customer_code
      FROM sales_orders so JOIN customers c ON c.id = so.customer_id
-     ${whereClause} ORDER BY so.order_date DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
-    params
-  );
+     ${whereClause} ORDER BY so.order_date DESC`;
+
+  if (limit === undefined) {
+    const { rows } = await query(baseQuery, params);
+    return { rows, total };
+  }
+
+  params.push(limit, offset);
+  const { rows } = await query(`${baseQuery} LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
   return { rows, total };
 }
 

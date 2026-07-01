@@ -23,7 +23,7 @@ export default function AuditLogsPage() {
         meta={table.meta}
         loading={table.loading}
         onPageChange={table.setPage}
-        onExport={(fmt) => window.open(auditLogApi.list ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'}/audit-logs?format=${fmt}` : undefined)}
+        onExport={(fmt) => auditLogApi.download(fmt, {})}
       />
     </div>
   );

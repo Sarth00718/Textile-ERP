@@ -45,6 +45,7 @@ import WorkerProductivityPage from './pages/operations/WorkerProductivityPage';
 import WasteManagementPage from './pages/operations/WasteManagementPage';
 import NotificationsPage from './pages/notifications/NotificationsPage';
 import AuditLogsPage from './pages/auditLogs/AuditLogsPage';
+import ReportsPage from './pages/reports/ReportsPage';
 import UserGuidePage from './pages/UserGuidePage';
 
 export default function App() {
@@ -98,6 +99,8 @@ export default function App() {
           <Route path="/operations/waste" element={<WasteManagementPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/audit-logs" element={<AuditLogsPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/reports/:reportType" element={<ReportsPage />} />
           <Route path="/user-guide" element={<UserGuidePage />} />
         </Route>
 

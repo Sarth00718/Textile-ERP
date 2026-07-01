@@ -66,7 +66,7 @@ export default function WasteManagementPage() {
         action={can('wasteManagement', 'manage') && <Button onClick={() => { reset({ wasteType: 'YARN_WASTE', wasteDate: new Date().toISOString().slice(0, 10) }); setModalOpen(true); }}><PlusIcon className="h-4 w-4" /> Log Waste</Button>} />
 
       <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage}
-        onExport={(fmt) => window.open(wasteApi.list ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'}/operations/waste?format=${fmt}` : undefined)}
+        onExport={(fmt) => wasteApi.download(fmt, {})}
       />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Log Waste Record">

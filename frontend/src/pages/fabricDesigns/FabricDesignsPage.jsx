@@ -99,7 +99,7 @@ export default function FabricDesignsPage() {
 
       <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage}
         onSearch={table.handleSearch} searchPlaceholder="Search fabric designs…"
-        onExport={(fmt) => window.open(fabricDesignApi.exportUrl(fmt))}
+        onExport={(fmt) => fabricDesignApi.download(fmt, { search: table.search })}
       />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Design' : 'New Fabric Design'}>

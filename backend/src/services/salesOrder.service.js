@@ -7,7 +7,7 @@ const { withTransaction } = require('../config/db');
 
 async function listSalesOrders(reqQuery) {
   const { page, pageSize, offset, limit } = getPagination(reqQuery);
-  const { rows, total } = await repo.list({ ...reqQuery, limit, offset });
+  const { rows, total } = await repo.list({ ...reqQuery, limit: reqQuery.format ? undefined : limit, offset: reqQuery.format ? undefined : offset });
   return { items: rows, meta: buildMeta(total, page, pageSize) };
 }
 
