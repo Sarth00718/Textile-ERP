@@ -5,9 +5,13 @@ const COLUMN_MAP = {
   capacityKg: 'capacity_kg', status: 'status', isActive: 'is_active',
 };
 
-async function list({ status, limit, offset }) {
+async function list({ search, status, limit, offset }) {
   const conditions = [];
   const params = [];
+  if (search) {
+    params.push(`%${search}%`);
+    conditions.push(`(vehicle_number ILIKE $${params.length} OR driver_name ILIKE $${params.length})`);
+  }
   if (status) {
     params.push(status);
     conditions.push(`status = $${params.length}`);
@@ -17,9 +21,14 @@ async function list({ status, limit, offset }) {
   const countRes = await query(`SELECT COUNT(*) FROM vehicles ${whereClause}`, params);
   const total = parseInt(countRes.rows[0].count, 10);
 
+  const baseQuery = `SELECT * FROM vehicles ${whereClause} ORDER BY vehicle_number`;
+  if (limit === undefined) {
+    const { rows } = await query(baseQuery, params);
+    return { rows, total };
+  }
   params.push(limit, offset);
   const { rows } = await query(
-    `SELECT * FROM vehicles ${whereClause} ORDER BY vehicle_number LIMIT $${params.length - 1} OFFSET $${params.length}`,
+    `${baseQuery} LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
   );
   return { rows, total };

@@ -79,11 +79,11 @@ export default function EmployeesPage() {
   async function confirmDelete() {
     try {
       await employeeApi.remove(deleting.id);
-      toast.success('Employee removed');
+      toast.success('Employee terminated');
       setDeleting(null);
       table.reload();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Could not delete employee');
+      toast.error(err.response?.data?.message || 'Could not terminate employee');
       setDeleting(null);
     }
   }
@@ -175,11 +175,11 @@ export default function EmployeesPage() {
 
       <ConfirmDialog
         open={!!deleting}
-        title="Remove employee?"
-        message={`This will permanently remove "${deleting?.full_name}" from the system.`}
+        title="Terminate employee?"
+        message={`"${deleting?.full_name}" will be marked as TERMINATED and their date of leaving will be set to today. All attendance and payroll history is preserved.`}
         onConfirm={confirmDelete}
         onCancel={() => setDeleting(null)}
-        confirmLabel="Remove"
+        confirmLabel="Terminate"
         danger
       />
     </div>

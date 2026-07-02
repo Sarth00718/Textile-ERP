@@ -1,4 +1,5 @@
 const repo = require('../repositories/supplier.repository');
+const { query } = require('../config/db');
 const { ApiError } = require('../utils/apiError');
 const { getPagination, buildMeta } = require('../utils/queryHelpers');
 
@@ -31,6 +32,14 @@ async function updateSupplier(id, data) {
 
 async function deleteSupplier(id) {
   await getSupplier(id);
+  // Guard: cannot deactivate if there are open/pending purchase orders
+  const { rows } = await query(
+    `SELECT COUNT(*) FROM purchase_orders WHERE supplier_id = $1 AND status NOT IN ('RECEIVED','CANCELLED')`,
+    [id]
+  );
+  if (parseInt(rows[0].count, 10) > 0) {
+    throw ApiError.conflict('Cannot deactivate this supplier — they have open purchase orders. Close or cancel those orders first.');
+  }
   await repo.remove(id);
 }
 

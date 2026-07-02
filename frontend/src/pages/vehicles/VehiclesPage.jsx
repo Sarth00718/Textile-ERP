@@ -87,7 +87,17 @@ export default function VehiclesPage() {
         action={can('vehicles', 'manage') && <Button onClick={openCreate}><PlusIcon className="h-4 w-4" /> Add Vehicle</Button>} />
 
       <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage}
-        onExport={(fmt) => vehicleApi.download(fmt, { ...table.filters })} />
+        onSearch={table.handleSearch} searchPlaceholder="Search vehicles…"
+        filters={
+          <select onChange={(e) => table.updateFilters({ status: e.target.value || undefined })}
+            className="rounded-md border border-steel-300 dark:border-steel-600 bg-white dark:bg-steel-800 px-2.5 py-1.5 text-sm">
+            <option value="">All statuses</option>
+            <option value="AVAILABLE">Available</option>
+            <option value="ON_TRIP">On Trip</option>
+            <option value="MAINTENANCE">Maintenance</option>
+          </select>
+        }
+        onExport={(fmt) => vehicleApi.download(fmt, { ...table.filters, search: table.search })} />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Vehicle' : 'Add Vehicle'}>
         <form onSubmit={handleSubmit(onSubmit)}>

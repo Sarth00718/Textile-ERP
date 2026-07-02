@@ -3,6 +3,10 @@ const { ApiError } = require('../utils/apiError');
 const { getPagination, buildMeta } = require('../utils/queryHelpers');
 
 async function listVehicles(reqQuery) {
+  if (reqQuery.format) {
+    const { rows } = await repo.list({ ...reqQuery, limit: undefined, offset: undefined });
+    return { items: rows };
+  }
   const { page, pageSize, offset, limit } = getPagination(reqQuery);
   const { rows, total } = await repo.list({ ...reqQuery, limit, offset });
   return { items: rows, meta: buildMeta(total, page, pageSize) };

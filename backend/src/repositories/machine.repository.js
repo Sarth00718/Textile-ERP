@@ -18,7 +18,7 @@ const COLUMN_MAP = {
 };
 
 async function list({ search, status, departmentId, sortBy, sortDir, limit, offset }) {
-  const conditions = [];
+  const conditions = ['m.is_active = TRUE'];
   const params = [];
 
   if (search) {
@@ -124,7 +124,8 @@ async function setStatus(id, status, operatorId, client = null) {
 }
 
 async function remove(id) {
-  await query('DELETE FROM machines WHERE id = $1', [id]);
+  // Soft-delete: machines may be referenced by production_orders (ON DELETE RESTRICT)
+  await query('UPDATE machines SET is_active = FALSE, status = $2, updated_at = NOW() WHERE id = $1', [id, 'OFFLINE']);
 }
 
 async function getUtilizationSummary() {

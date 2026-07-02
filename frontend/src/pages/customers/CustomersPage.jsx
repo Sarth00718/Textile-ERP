@@ -60,11 +60,11 @@ export default function CustomersPage() {
   async function confirmDelete() {
     try {
       await customerApi.remove(deleting.id);
-      toast.success('Customer deleted');
+      toast.success('Customer deactivated');
       setDeleting(null);
       table.reload();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Could not delete customer');
+      toast.error(err.response?.data?.message || 'Could not deactivate customer');
       setDeleting(null);
     }
   }
@@ -125,8 +125,8 @@ export default function CustomersPage() {
         </form>
       </Modal>
 
-      <ConfirmDialog open={!!deleting} title="Delete customer?" message={`This will permanently delete "${deleting?.name}".`}
-        onConfirm={confirmDelete} onCancel={() => setDeleting(null)} confirmLabel="Delete" danger />
+      <ConfirmDialog open={!!deleting} title="Deactivate customer?" message={`"${deleting?.name}" will be deactivated. Open sales orders must be closed first.`}
+        onConfirm={confirmDelete} onCancel={() => setDeleting(null)} confirmLabel="Deactivate" danger />
     </div>
   );
 }

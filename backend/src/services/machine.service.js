@@ -30,7 +30,10 @@ async function updateMachine(id, data, userId) {
 }
 
 async function deleteMachine(id) {
-  await getMachine(id);
+  const machine = await getMachine(id);
+  if (machine.status === 'RUNNING') {
+    throw ApiError.conflict('Cannot deactivate a machine that is currently running. Change its status first.');
+  }
   await repo.remove(id);
 }
 

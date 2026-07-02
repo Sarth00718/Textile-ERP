@@ -57,11 +57,11 @@ export default function SuppliersPage() {
   async function confirmDelete() {
     try {
       await supplierApi.remove(deleting.id);
-      toast.success('Supplier deleted');
+      toast.success('Supplier deactivated');
       setDeleting(null);
       table.reload();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Could not delete supplier');
+      toast.error(err.response?.data?.message || 'Could not deactivate supplier');
       setDeleting(null);
     }
   }
@@ -120,8 +120,8 @@ export default function SuppliersPage() {
         </form>
       </Modal>
 
-      <ConfirmDialog open={!!deleting} title="Delete supplier?" message={`This will permanently delete "${deleting?.name}".`}
-        onConfirm={confirmDelete} onCancel={() => setDeleting(null)} confirmLabel="Delete" danger />
+      <ConfirmDialog open={!!deleting} title="Deactivate supplier?" message={`"${deleting?.name}" will be deactivated and hidden from future orders. Existing purchase orders are preserved.`}
+        onConfirm={confirmDelete} onCancel={() => setDeleting(null)} confirmLabel="Deactivate" danger />
     </div>
   );
 }

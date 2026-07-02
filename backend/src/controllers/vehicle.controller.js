@@ -1,9 +1,22 @@
 const service = require('../services/vehicle.service');
 const { asyncHandler } = require('../utils/apiError');
 const { recordAudit } = require('../services/audit.service');
+const { exportCsv, exportExcel, exportPdf } = require('../utils/exporters');
+
+const EXPORT_COLUMNS = [
+  { key: 'vehicle_number', header: 'Vehicle Number' },
+  { key: 'vehicle_type', header: 'Type' },
+  { key: 'driver_name', header: 'Driver' },
+  { key: 'driver_phone', header: 'Driver Phone' },
+  { key: 'capacity_kg', header: 'Capacity (kg)' },
+  { key: 'status', header: 'Status' },
+];
 
 const list = asyncHandler(async (req, res) => {
   const result = await service.listVehicles(req.query);
+  if (req.query.format === 'csv') return exportCsv(res, 'vehicles', EXPORT_COLUMNS, result.items);
+  if (req.query.format === 'excel') return exportExcel(res, 'vehicles', EXPORT_COLUMNS, result.items, 'Vehicles');
+  if (req.query.format === 'pdf') return exportPdf(res, 'vehicles', 'Vehicle List', EXPORT_COLUMNS, result.items);
   res.json({ success: true, ...result });
 });
 

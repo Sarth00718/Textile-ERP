@@ -68,11 +68,11 @@ export default function MachinesPage() {
   async function confirmDelete() {
     try {
       await machineApi.remove(deleting.id);
-      toast.success('Machine deleted');
+      toast.success('Machine deactivated');
       setDeleting(null);
       table.reload();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Could not delete machine');
+      toast.error(err.response?.data?.message || 'Could not deactivate machine');
       setDeleting(null);
     }
   }
@@ -162,8 +162,8 @@ export default function MachinesPage() {
         </form>
       </Modal>
 
-      <ConfirmDialog open={!!deleting} title="Delete machine?" message={`This will permanently delete "${deleting?.name}".`}
-        onConfirm={confirmDelete} onCancel={() => setDeleting(null)} confirmLabel="Delete" danger />
+      <ConfirmDialog open={!!deleting} title="Deactivate machine?" message={`"${deleting?.name}" will be set to OFFLINE and deactivated. Production history is preserved.`}
+        onConfirm={confirmDelete} onCancel={() => setDeleting(null)} confirmLabel="Deactivate" danger />
     </div>
   );
 }

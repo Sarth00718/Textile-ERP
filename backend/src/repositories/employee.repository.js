@@ -140,7 +140,12 @@ async function update(id, data, userId) {
 }
 
 async function remove(id) {
-  await query('DELETE FROM employees WHERE id = $1', [id]);
+  // Soft-delete: set employment_status to TERMINATED to preserve payroll/attendance history
+  await query(
+    `UPDATE employees SET employment_status = 'TERMINATED', date_of_leaving = CURRENT_DATE,
+     updated_at = NOW() WHERE id = $1`,
+    [id]
+  );
 }
 
 module.exports = { list, findById, create, update, remove, generateEmployeeCode };

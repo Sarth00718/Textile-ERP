@@ -1,4 +1,5 @@
 const repo = require('../repositories/customer.repository');
+const { query } = require('../config/db');
 const { ApiError } = require('../utils/apiError');
 const { getPagination, buildMeta } = require('../utils/queryHelpers');
 
@@ -31,6 +32,14 @@ async function updateCustomer(id, data) {
 
 async function deleteCustomer(id) {
   await getCustomer(id);
+  // Guard: cannot deactivate if there are open/pending sales orders
+  const { rows } = await query(
+    `SELECT COUNT(*) FROM sales_orders WHERE customer_id = $1 AND status NOT IN ('DELIVERED','CANCELLED')`,
+    [id]
+  );
+  if (parseInt(rows[0].count, 10) > 0) {
+    throw ApiError.conflict('Cannot deactivate this customer — they have open sales orders. Close or cancel those orders first.');
+  }
   await repo.remove(id);
 }
 

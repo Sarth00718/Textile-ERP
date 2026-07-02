@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const repo = require('../repositories/employee.repository');
 const authRepo = require('../repositories/auth.repository');
+const { query } = require('../config/db');
 const { ApiError } = require('../utils/apiError');
 const { getPagination, buildMeta } = require('../utils/queryHelpers');
 const { withTransaction } = require('../config/db');
@@ -87,6 +88,16 @@ async function updateEmployee(id, data, userId) {
 
 async function deleteEmployee(id) {
   await getEmployee(id);
+  // Guard: cannot terminate if currently assigned as operator on a running machine
+  const { rows } = await query(
+    `SELECT COUNT(*) FROM machines WHERE current_operator_id = $1 AND status = 'RUNNING'`,
+    [id]
+  );
+  if (parseInt(rows[0].count, 10) > 0) {
+    throw ApiError.conflict('Cannot terminate an employee who is the current operator of a running machine. Reassign the machine first.');
+  }
+  // Unlink them from any machines as operator
+  await query('UPDATE machines SET current_operator_id = NULL, updated_at = NOW() WHERE current_operator_id = $1', [id]);
   await repo.remove(id);
 }
 

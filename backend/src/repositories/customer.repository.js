@@ -73,7 +73,8 @@ async function update(id, data) {
 }
 
 async function remove(id) {
-  await query('DELETE FROM customers WHERE id = $1', [id]);
+  // Soft-delete: customers may be referenced by sales_orders and dispatches (ON DELETE RESTRICT)
+  await query('UPDATE customers SET is_active = FALSE, updated_at = NOW() WHERE id = $1', [id]);
 }
 
 module.exports = { list, findById, findByCode, create, update, remove };
