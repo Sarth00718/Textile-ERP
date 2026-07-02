@@ -76,6 +76,9 @@ export default function QualityControlPage() {
           </select>
         }
         onExport={(fmt) => qualityControlApi.download(fmt, { ...table.filters })}
+      />
+
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Record Quality Inspection">
         <form onSubmit={handleSubmit(onSubmit)}>
           <Select label="Fabric Roll" required register={register} name="fabricRollId" placeholder="Select roll" error={errors.fabricRollId}
             options={rolls.map((r) => ({ value: r.id, label: r.roll_no }))} />
