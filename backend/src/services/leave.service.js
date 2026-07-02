@@ -3,7 +3,7 @@ const attendanceRepo = require('../repositories/attendance.repository');
 const { ApiError } = require('../utils/apiError');
 const { getPagination, buildMeta } = require('../utils/queryHelpers');
 const { withTransaction } = require('../config/db');
-const { notifyRoles } = require('./notification.service');
+const { notifyRoles, notifyUser } = require('./notification.service');
 const payrollService = require('./payroll.service');
 
 function countDaysInclusive(startDate, endDate) {
@@ -34,7 +34,20 @@ async function createLeaveRequest(data) {
   if (overlaps.length) {
     throw ApiError.conflict('Leave request overlaps with an existing pending or approved leave');
   }
-  return repo.create({ ...data, totalDays });
+  const lr = await repo.create({ ...data, totalDays });
+
+  // Notify managers of new leave request
+  await notifyRoles({
+    roles: ['OWNER', 'MANAGER'],
+    title: 'New Leave Request',
+    message: `A new leave request has been submitted for ${lr.start_date} to ${lr.end_date} (${totalDays} day${totalDays !== 1 ? 's' : ''}).`,
+    severity: 'INFO',
+    module: 'leave',
+    referenceType: 'leave_requests',
+    referenceId: lr.id,
+  }).catch(() => {});
+
+  return lr;
 }
 
 /**
@@ -117,7 +130,22 @@ async function rejectLeaveRequest(id, approverId, rejectionReason) {
   if (existing.status !== 'PENDING') {
     throw ApiError.conflict(`Leave request is already ${existing.status.toLowerCase()}`);
   }
-  return repo.updateStatus(id, 'REJECTED', approverId, rejectionReason);
+  const result = await repo.updateStatus(id, 'REJECTED', approverId, rejectionReason);
+
+  // Notify the employee if they have a linked user account
+  if (existing.user_id) {
+    await notifyUser({
+      userId: existing.user_id,
+      title: 'Leave Request Rejected',
+      message: `Your leave request (${existing.start_date} to ${existing.end_date}) was rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ''}`,
+      severity: 'WARNING',
+      module: 'leave',
+      referenceType: 'leave_requests',
+      referenceId: id,
+    }).catch(() => {});
+  }
+
+  return result;
 }
 
 async function cancelLeaveRequest(id) {

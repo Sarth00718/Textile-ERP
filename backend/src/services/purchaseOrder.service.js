@@ -5,6 +5,7 @@ const txnRepo = require('../repositories/inventoryTransaction.repository');
 const { ApiError } = require('../utils/apiError');
 const { getPagination, buildMeta } = require('../utils/queryHelpers');
 const { withTransaction } = require('../config/db');
+const { notifyRoles } = require('./notification.service');
 
 async function listPOs(reqQuery) {
   const { page, pageSize, offset, limit } = getPagination(reqQuery);
@@ -78,7 +79,7 @@ async function receivePO(id, receipts, userId) {
     }
   }
 
-  return withTransaction(async (client) => {
+  const result = await withTransaction(async (client) => {
     for (const r of receipts) {
       const poItem = itemsById.get(r.poItemId);
       await repo.incrementItemReceived(r.poItemId, r.quantityReceived, client);
@@ -101,6 +102,36 @@ async function receivePO(id, receipts, userId) {
 
     return { ...updatedPO, items: refreshedItems };
   });
+
+  // Notify managers of stock received
+  await notifyRoles({
+    roles: ['OWNER', 'MANAGER'],
+    title: 'Purchase Order Goods Received',
+    message: `Goods received against PO ${po.po_number}. Status: ${result.status}.`,
+    severity: 'INFO',
+    module: 'purchaseOrders',
+    referenceType: 'purchase_orders',
+    referenceId: id,
+  }).catch(() => {});
+
+  // Check for low stock on received items and fire alerts
+  for (const r of receipts) {
+    const poItem = itemsById.get(r.poItemId);
+    const updatedItem = await inventoryRepo.findById(poItem.inventory_item_id);
+    if (updatedItem && Number(updatedItem.current_stock) <= Number(updatedItem.reorder_level)) {
+      await notifyRoles({
+        roles: ['OWNER', 'MANAGER'],
+        title: 'Low Stock Alert',
+        message: `${updatedItem.name} stock is ${updatedItem.current_stock} ${updatedItem.unit}, at or below reorder level (${updatedItem.reorder_level}).`,
+        severity: 'WARNING',
+        module: 'inventory',
+        referenceType: 'inventory_items',
+        referenceId: updatedItem.id,
+      }).catch(() => {});
+    }
+  }
+
+  return result;
 }
 
 module.exports = { listPOs, getPO, createPO, sendPO, cancelPO, receivePO };

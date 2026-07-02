@@ -92,11 +92,23 @@ async function resolveBreakdown(id, resolvedBy, resolutionNotes) {
   if (breakdown.status === 'RESOLVED') {
     throw ApiError.conflict('Breakdown is already resolved');
   }
-  return withTransaction(async (client) => {
+  const result = await withTransaction(async (client) => {
     const resolved = await repo.resolveBreakdown(id, resolvedBy, resolutionNotes, client);
     await machineRepo.setStatus(breakdown.machine_id, 'IDLE', undefined, client);
     return resolved;
   });
+
+  await notifyRoles({
+    roles: ['OWNER', 'MANAGER', 'SUPERVISOR'],
+    title: 'Breakdown Resolved',
+    message: `Breakdown on machine ${breakdown.machine_name || breakdown.machine_id} has been resolved. Machine is now IDLE.`,
+    severity: 'INFO',
+    module: 'machineBreakdown',
+    referenceType: 'machine_breakdowns',
+    referenceId: id,
+  }).catch(() => {});
+
+  return result;
 }
 
 // ---- Maintenance ----
@@ -104,7 +116,19 @@ async function resolveBreakdown(id, resolvedBy, resolutionNotes) {
 async function scheduleMaintenance(data, userId) {
   const machine = await machineRepo.findById(data.machineId);
   if (!machine) throw ApiError.notFound('Machine not found');
-  return repo.createMaintenance(data, userId);
+  const record = await repo.createMaintenance(data, userId);
+
+  await notifyRoles({
+    roles: ['OWNER', 'MANAGER', 'SUPERVISOR'],
+    title: 'Maintenance Scheduled',
+    message: `${data.maintenanceType || 'Preventive'} maintenance scheduled for ${machine.name} (${machine.machine_code}) on ${data.scheduledDate}.`,
+    severity: 'INFO',
+    module: 'machineMaintenance',
+    referenceType: 'machine_maintenance',
+    referenceId: record.id,
+  }).catch(() => {});
+
+  return record;
 }
 
 async function listMaintenance(reqQuery) {
@@ -122,7 +146,7 @@ async function getMaintenance(id) {
 async function updateMaintenance(id, data) {
   const existing = await getMaintenance(id);
 
-  return withTransaction(async (client) => {
+  const result = await withTransaction(async (client) => {
     const updated = await repo.updateMaintenance(id, data, client);
     if (data.status === 'IN_PROGRESS') {
       await machineRepo.setStatus(existing.machine_id, 'MAINTENANCE', undefined, client);
@@ -131,6 +155,21 @@ async function updateMaintenance(id, data) {
     }
     return updated;
   });
+
+  if (data.status === 'COMPLETED') {
+    const machine = await machineRepo.findById(existing.machine_id);
+    await notifyRoles({
+      roles: ['OWNER', 'MANAGER', 'SUPERVISOR'],
+      title: 'Maintenance Completed',
+      message: `Maintenance on ${machine?.name || 'machine'} has been completed and the machine is back IDLE.`,
+      severity: 'INFO',
+      module: 'machineMaintenance',
+      referenceType: 'machine_maintenance',
+      referenceId: id,
+    }).catch(() => {});
+  }
+
+  return result;
 }
 
 module.exports = {

@@ -6,6 +6,7 @@ const vehicleRepo = require('../repositories/vehicle.repository');
 const { ApiError } = require('../utils/apiError');
 const { getPagination, buildMeta } = require('../utils/queryHelpers');
 const { withTransaction } = require('../config/db');
+const { notifyRoles } = require('./notification.service');
 
 async function listDispatches(reqQuery) {
   if (reqQuery.format) {
@@ -67,7 +68,7 @@ async function createDispatch(data, userId) {
   const totalWeight = packingRecords.reduce((sum, pr) => sum + Number(pr.package_weight_kg || 0), 0);
   const soItems = await salesOrderRepo.findItemsBySO(data.salesOrderId);
 
-  return withTransaction(async (client) => {
+  const result = await withTransaction(async (client) => {
     const dispatch = await repo.create(data, salesOrder.customer_id, totalWeight, packingRecords.length, userId, client);
 
     const dispatchedByDesign = {};
@@ -98,6 +99,19 @@ async function createDispatch(data, userId) {
 
     return { ...dispatch, items: await repo.findItemsByDispatch(dispatch.id) };
   });
+
+  // Notify managers & owners of new dispatch
+  await notifyRoles({
+    roles: ['OWNER', 'MANAGER'],
+    title: 'Dispatch Created',
+    message: `Dispatch ${result.dispatch_no} created for SO ${salesOrder.so_number} — ${packingRecords.length} package(s), ${totalWeight.toFixed(1)} kg total.`,
+    severity: 'INFO',
+    module: 'dispatch',
+    referenceType: 'dispatches',
+    referenceId: result.id,
+  }).catch(() => {});
+
+  return result;
 }
 
 async function markInTransit(id) {
@@ -114,13 +128,25 @@ async function markDelivered(id) {
   if (d.status !== 'IN_TRANSIT') {
     throw ApiError.conflict(`Only an IN_TRANSIT dispatch can be marked as delivered (current status: ${d.status})`);
   }
-  return withTransaction(async (client) => {
-    const updated = await repo.setStatus(id, 'DELIVERED', new Date().toISOString(), client);
+  const updated = await withTransaction(async (client) => {
+    const result = await repo.setStatus(id, 'DELIVERED', new Date().toISOString(), client);
     if (d.vehicle_id) {
       await vehicleRepo.setStatus(d.vehicle_id, 'AVAILABLE', client);
     }
-    return updated;
+    return result;
   });
+
+  await notifyRoles({
+    roles: ['OWNER', 'MANAGER'],
+    title: 'Dispatch Delivered',
+    message: `Dispatch ${d.dispatch_no} has been delivered to ${d.customer_name}.`,
+    severity: 'INFO',
+    module: 'dispatch',
+    referenceType: 'dispatches',
+    referenceId: id,
+  }).catch(() => {});
+
+  return updated;
 }
 
 module.exports = { listDispatches, getDispatch, createDispatch, markInTransit, markDelivered };

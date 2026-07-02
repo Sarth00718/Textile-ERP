@@ -5,8 +5,13 @@ const list = asyncHandler(async (req, res) => {
   const unreadOnly = req.query.unreadOnly === 'true';
   const limit = parseInt(req.query.limit, 10) || 50;
   const offset = parseInt(req.query.offset, 10) || 0;
-  const items = await service.listForUser(req.user.id, { unreadOnly, limit, offset });
-  res.json({ success: true, data: items });
+  const result = await service.listForUser(req.user.id, { unreadOnly, limit, offset });
+  res.json({ success: true, data: result.items, unreadCount: result.unreadCount });
+});
+
+const unreadCount = asyncHandler(async (req, res) => {
+  const count = await service.getUnreadCount(req.user.id);
+  res.json({ success: true, data: { count } });
 });
 
 const markRead = asyncHandler(async (req, res) => {
@@ -19,4 +24,4 @@ const markAllRead = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'All notifications marked as read' });
 });
 
-module.exports = { list, markRead, markAllRead };
+module.exports = { list, unreadCount, markRead, markAllRead };

@@ -11,6 +11,7 @@ const router = express.Router();
 router.use(authenticate);
 
 router.get('/', authorize('notifications', 'view'), ctrl.list);
+router.get('/unread-count', authorize('notifications', 'view'), ctrl.unreadCount);
 router.post('/:id/read', authorize('notifications', 'view'), validate({ params: idParamSchema }), ctrl.markRead);
 router.post('/mark-all-read', authorize('notifications', 'view'), ctrl.markAllRead);
 

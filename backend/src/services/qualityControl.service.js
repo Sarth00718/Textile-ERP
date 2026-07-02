@@ -3,6 +3,7 @@ const fabricRollRepo = require('../repositories/fabricRoll.repository');
 const { ApiError } = require('../utils/apiError');
 const { getPagination, buildMeta } = require('../utils/queryHelpers');
 const { withTransaction } = require('../config/db');
+const { notifyRoles } = require('./notification.service');
 
 async function listInspections(reqQuery) {
   if (reqQuery.format) {
@@ -34,11 +35,26 @@ async function recordInspection(data) {
 
   const rollStatusMap = { PASS: 'QC_PASSED', FAIL: 'QC_FAILED', REWORK: 'IN_QC' };
 
-  return withTransaction(async (client) => {
-    const inspection = await repo.create(data, client);
+  const inspection = await withTransaction(async (client) => {
+    const record = await repo.create(data, client);
     await fabricRollRepo.setStatus(data.fabricRollId, rollStatusMap[data.result], client);
-    return inspection;
+    return record;
   });
+
+  // Notify supervisors on QC failure — requires immediate attention
+  if (data.result === 'FAIL') {
+    await notifyRoles({
+      roles: ['OWNER', 'MANAGER', 'SUPERVISOR'],
+      title: 'QC Inspection Failed',
+      message: `Roll ${roll.roll_no} failed quality inspection.${data.defectType ? ` Defect type: ${data.defectType}.` : ''} Immediate action required.`,
+      severity: 'WARNING',
+      module: 'qualityControl',
+      referenceType: 'quality_inspections',
+      referenceId: inspection.id,
+    }).catch(() => {});
+  }
+
+  return inspection;
 }
 
 module.exports = { listInspections, getInspection, recordInspection };

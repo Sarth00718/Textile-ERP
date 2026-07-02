@@ -3,6 +3,7 @@ const attendanceRepo = require('../repositories/attendance.repository');
 const { ApiError } = require('../utils/apiError');
 const { getPagination, buildMeta } = require('../utils/queryHelpers');
 const { withTransaction } = require('../config/db');
+const { notifyRoles } = require('./notification.service');
 
 function collectAffectedPeriods(startDate, endDate) {
   const periods = [];
@@ -124,7 +125,20 @@ async function rebuildPayrollRun(periodMonth, periodYear, userId, client) {
 }
 
 async function generatePayrollRun({ periodMonth, periodYear }, userId) {
-  return withTransaction((client) => rebuildPayrollRun(periodMonth, periodYear, userId, client));
+  const run = await withTransaction((client) => rebuildPayrollRun(periodMonth, periodYear, userId, client));
+
+  // Notify owners & accountants that payroll is ready for review
+  await notifyRoles({
+    roles: ['OWNER', 'ACCOUNTANT'],
+    title: 'Payroll Generated',
+    message: `Payroll for ${periodMonth}/${periodYear} has been generated. Total: ₹${Number(run.total_amount).toLocaleString()}. Review and mark as paid.`,
+    severity: 'INFO',
+    module: 'payroll',
+    referenceType: 'payroll_runs',
+    referenceId: run.id,
+  }).catch(() => {});
+
+  return run;
 }
 
 async function recalculatePayrollForPeriods(periods, userId, client = null) {
@@ -150,11 +164,24 @@ async function markPayrollPaid(id) {
   if (run.status !== 'GENERATED') {
     throw ApiError.conflict('Only a generated payroll run can be marked as paid');
   }
-  return withTransaction(async (client) => {
+  const result = await withTransaction(async (client) => {
     const updated = await repo.setRunStatus(id, 'PAID', run.total_amount, client);
     await repo.markItemsPaid(id, client);
     return updated;
   });
+
+  // Notify managers & owners that payroll is paid
+  await notifyRoles({
+    roles: ['OWNER', 'MANAGER', 'ACCOUNTANT'],
+    title: 'Payroll Marked as Paid',
+    message: `Payroll for ${run.period_month}/${run.period_year} has been marked as paid. Total disbursed: ₹${Number(run.total_amount).toLocaleString()}.`,
+    severity: 'INFO',
+    module: 'payroll',
+    referenceType: 'payroll_runs',
+    referenceId: id,
+  }).catch(() => {});
+
+  return result;
 }
 
 module.exports = { listPayrollRuns, getPayrollRun, generatePayrollRun, markPayrollPaid, recalculatePayrollForPeriods, collectAffectedPeriods };
