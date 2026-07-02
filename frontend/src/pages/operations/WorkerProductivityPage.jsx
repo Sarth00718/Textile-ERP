@@ -63,7 +63,8 @@ export default function WorkerProductivityPage() {
       <PageHeader title="Worker Productivity" description="Per-employee output and efficiency tracking"
         action={can('workerProductivity', 'manage') && <Button onClick={() => { reset({ productionDate: new Date().toISOString().slice(0, 10) }); setModalOpen(true); }}><PlusIcon className="h-4 w-4" /> Record Productivity</Button>} />
 
-      <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage} />
+      <DataTable columns={columns} rows={table.items} meta={table.meta} loading={table.loading} onPageChange={table.setPage}
+        onExport={(fmt) => productivityApi.download(fmt, { ...table.filters })} />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Record Worker Productivity">
         <form onSubmit={handleSubmit(onSubmit)}>

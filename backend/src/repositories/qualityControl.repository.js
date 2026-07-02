@@ -26,15 +26,18 @@ async function list({ result, fabricRollId, limit, offset }) {
   const countRes = await query(`SELECT COUNT(*) FROM quality_inspections qi ${whereClause}`, params);
   const total = parseInt(countRes.rows[0].count, 10);
 
-  params.push(limit, offset);
-  const { rows } = await query(
-    `SELECT qi.*, fr.roll_no, e.full_name AS inspector_name
+  const baseQuery = `SELECT qi.*, fr.roll_no, e.full_name AS inspected_by_name
      FROM quality_inspections qi
      JOIN fabric_rolls fr ON fr.id = qi.fabric_roll_id
      LEFT JOIN employees e ON e.id = qi.inspected_by
-     ${whereClause} ORDER BY qi.inspection_date DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
-    params
-  );
+     ${whereClause} ORDER BY qi.inspection_date DESC`;
+
+  if (limit === undefined) {
+    const { rows } = await query(baseQuery, params);
+    return { rows, total };
+  }
+  params.push(limit, offset);
+  const { rows } = await query(`${baseQuery} LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
   return { rows, total };
 }
 

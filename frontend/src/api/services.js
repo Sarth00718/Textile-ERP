@@ -27,7 +27,8 @@ export const payrollApi = {
   get: (id) => api.get(`/payroll/${id}`).then((r) => r.data),
   generate: (payload) => api.post('/payroll/generate', payload).then((r) => r.data),
   markPaid: (id) => api.post(`/payroll/${id}/mark-paid`).then((r) => r.data),
-  download: (format, params = {}) => downloadExport('/payroll', { ...params, format }, 'payroll'),
+  download: (format, params = {}) => downloadExport('/payroll', { ...params, format }, 'payroll-runs'),
+  downloadRun: (id, format) => downloadExport(`/payroll/${id}`, { format }, `payroll-run-${id}`),
 };
 
 export const machineApi = {

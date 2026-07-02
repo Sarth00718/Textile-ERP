@@ -1,7 +1,8 @@
 const { query } = require('../config/db');
 
-async function nextPackageNumber() {
-  const { rows } = await query(
+async function nextPackageNumber(client = null) {
+  const executor = client || { query };
+  const { rows } = await executor.query(
     `SELECT 'PKG-' || LPAD((COALESCE(MAX(SUBSTRING(package_no FROM 5)::INT), 0) + 1)::TEXT, 6, '0') AS next_no
      FROM packing_records WHERE package_no ~ '^PKG-[0-9]+$'`
   );
@@ -10,7 +11,7 @@ async function nextPackageNumber() {
 
 async function create(data, client = null) {
   const executor = client || { query };
-  const packageNo = await nextPackageNumber();
+  const packageNo = await nextPackageNumber(executor);
   const { rows } = await executor.query(
     `INSERT INTO packing_records (package_no, fabric_roll_id, packed_by, package_weight_kg, package_type, status)
      VALUES ($1,$2,$3,$4,$5,'PENDING') RETURNING *`,
@@ -31,13 +32,16 @@ async function list({ status, limit, offset }) {
   const countRes = await query(`SELECT COUNT(*) FROM packing_records pr ${whereClause}`, params);
   const total = parseInt(countRes.rows[0].count, 10);
 
-  params.push(limit, offset);
-  const { rows } = await query(
-    `SELECT pr.*, fr.roll_no, fr.length_meters FROM packing_records pr
+  const baseQuery = `SELECT pr.*, fr.roll_no, fr.length_meters FROM packing_records pr
      JOIN fabric_rolls fr ON fr.id = pr.fabric_roll_id
-     ${whereClause} ORDER BY pr.packed_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
-    params
-  );
+     ${whereClause} ORDER BY pr.packed_at DESC`;
+
+  if (limit === undefined) {
+    const { rows } = await query(baseQuery, params);
+    return { rows, total };
+  }
+  params.push(limit, offset);
+  const { rows } = await query(`${baseQuery} LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
   return { rows, total };
 }
 

@@ -36,6 +36,10 @@ async function recordProductivity(data) {
   return productivityRepo.upsert(data);
 }
 async function listProductivity(reqQuery) {
+  if (reqQuery.format) {
+    const { rows } = await productivityRepo.list({ ...reqQuery, limit: undefined, offset: undefined });
+    return { items: rows };
+  }
   const { page, pageSize, offset, limit } = getPagination(reqQuery);
   const { rows, total } = await productivityRepo.list({ ...reqQuery, limit, offset });
   return { items: rows, meta: buildMeta(total, page, pageSize) };

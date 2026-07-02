@@ -1,7 +1,8 @@
 const { query } = require('../config/db');
 
-async function nextDispatchNumber() {
-  const { rows } = await query(
+async function nextDispatchNumber(client = null) {
+  const executor = client || { query };
+  const { rows } = await executor.query(
     `SELECT 'DSP-' || LPAD((COALESCE(MAX(SUBSTRING(dispatch_no FROM 5)::INT), 0) + 1)::TEXT, 6, '0') AS next_no
      FROM dispatches WHERE dispatch_no ~ '^DSP-[0-9]+$'`
   );
@@ -10,7 +11,7 @@ async function nextDispatchNumber() {
 
 async function create(data, customerId, totalWeight, totalPackages, userId, client) {
   const executor = client || { query };
-  const dispatchNo = await nextDispatchNumber();
+  const dispatchNo = await nextDispatchNumber(executor);
   const { rows } = await executor.query(
     `INSERT INTO dispatches (dispatch_no, sales_order_id, customer_id, vehicle_id, dispatch_date, status, total_weight_kg, total_packages, notes, created_by)
      VALUES ($1,$2,$3,$4,$5,'PENDING',$6,$7,$8,$9) RETURNING *`,
@@ -57,16 +58,19 @@ async function list({ status, salesOrderId, limit, offset }) {
   const countRes = await query(`SELECT COUNT(*) FROM dispatches d ${whereClause}`, params);
   const total = parseInt(countRes.rows[0].count, 10);
 
-  params.push(limit, offset);
-  const { rows } = await query(
-    `SELECT d.*, so.so_number, c.name AS customer_name, v.vehicle_number
+  const baseQuery = `SELECT d.*, so.so_number, c.name AS customer_name, v.vehicle_number
      FROM dispatches d
      JOIN sales_orders so ON so.id = d.sales_order_id
      JOIN customers c ON c.id = d.customer_id
      LEFT JOIN vehicles v ON v.id = d.vehicle_id
-     ${whereClause} ORDER BY d.dispatch_date DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
-    params
-  );
+     ${whereClause} ORDER BY d.dispatch_date DESC`;
+
+  if (limit === undefined) {
+    const { rows } = await query(baseQuery, params);
+    return { rows, total };
+  }
+  params.push(limit, offset);
+  const { rows } = await query(`${baseQuery} LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
   return { rows, total };
 }
 

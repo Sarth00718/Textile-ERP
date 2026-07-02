@@ -41,8 +41,20 @@ const createWater = asyncHandler(async (req, res) => {
 });
 
 // ---- Worker Productivity ----
+const PRODUCTIVITY_COLUMNS = [
+  { key: 'production_date', header: 'Date' },
+  { key: 'employee_name', header: 'Employee' },
+  { key: 'machine_name', header: 'Machine' },
+  { key: 'quantity_produced_meters', header: 'Produced (m)' },
+  { key: 'hours_worked', header: 'Hours Worked' },
+  { key: 'efficiency_percent', header: 'Efficiency (m/hr)' },
+  { key: 'defect_count', header: 'Defects' },
+];
 const listProductivity = asyncHandler(async (req, res) => {
   const result = await service.listProductivity(req.query);
+  if (req.query.format === 'csv') return exportCsv(res, 'worker-productivity', PRODUCTIVITY_COLUMNS, result.items);
+  if (req.query.format === 'excel') return exportExcel(res, 'worker-productivity', PRODUCTIVITY_COLUMNS, result.items, 'Worker Productivity');
+  if (req.query.format === 'pdf') return exportPdf(res, 'worker-productivity', 'Worker Productivity Report', PRODUCTIVITY_COLUMNS, result.items);
   res.json({ success: true, ...result });
 });
 const recordProductivity = asyncHandler(async (req, res) => {

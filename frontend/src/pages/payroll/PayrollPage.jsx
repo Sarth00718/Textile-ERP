@@ -94,9 +94,14 @@ export default function PayrollPage() {
           <div>
             <div className="mb-3 flex items-center justify-between">
               <StatusBadge status={viewing.status} />
-              {viewing.status === 'GENERATED' && can('payroll', 'manage') && (
-                <Button size="sm" onClick={() => handleMarkPaid(viewing.id)}>Mark All Paid</Button>
-              )}
+              <div className="flex gap-2">
+                {viewing.status === 'GENERATED' && can('payroll', 'manage') && (
+                  <Button size="sm" onClick={() => handleMarkPaid(viewing.id)}>Mark All Paid</Button>
+                )}
+                <Button size="sm" variant="secondary" onClick={() => payrollApi.downloadRun(viewing.id, 'csv')}>CSV</Button>
+                <Button size="sm" variant="secondary" onClick={() => payrollApi.downloadRun(viewing.id, 'excel')}>Excel</Button>
+                <Button size="sm" variant="secondary" onClick={() => payrollApi.downloadRun(viewing.id, 'pdf')}>PDF</Button>
+              </div>
             </div>
             <div className="overflow-x-auto rounded-lg border border-steel-200 dark:border-steel-700 max-h-96 overflow-y-auto">
               <table className="min-w-full divide-y divide-steel-200 dark:divide-steel-700 text-sm">

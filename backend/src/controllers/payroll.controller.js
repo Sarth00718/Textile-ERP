@@ -15,8 +15,19 @@ const EXPORT_COLUMNS = [
   { key: 'net_salary', header: 'Net Salary' },
 ];
 
+const RUN_EXPORT_COLUMNS = [
+  { key: 'period_month', header: 'Month' },
+  { key: 'period_year', header: 'Year' },
+  { key: 'status', header: 'Status' },
+  { key: 'total_amount', header: 'Total Amount' },
+  { key: 'generated_at', header: 'Generated At' },
+];
+
 const list = asyncHandler(async (req, res) => {
   const result = await service.listPayrollRuns(req.query);
+  if (req.query.format === 'csv') return exportCsv(res, 'payroll-runs', RUN_EXPORT_COLUMNS, result.items);
+  if (req.query.format === 'excel') return exportExcel(res, 'payroll-runs', RUN_EXPORT_COLUMNS, result.items, 'Payroll Runs');
+  if (req.query.format === 'pdf') return exportPdf(res, 'payroll-runs', 'Payroll Runs', RUN_EXPORT_COLUMNS, result.items);
   res.json({ success: true, ...result });
 });
 

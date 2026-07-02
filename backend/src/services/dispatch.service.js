@@ -8,6 +8,10 @@ const { getPagination, buildMeta } = require('../utils/queryHelpers');
 const { withTransaction } = require('../config/db');
 
 async function listDispatches(reqQuery) {
+  if (reqQuery.format) {
+    const { rows } = await repo.list({ ...reqQuery, limit: undefined, offset: undefined });
+    return { items: rows };
+  }
   const { page, pageSize, offset, limit } = getPagination(reqQuery);
   const { rows, total } = await repo.list({ ...reqQuery, limit, offset });
   return { items: rows, meta: buildMeta(total, page, pageSize) };
@@ -107,8 +111,8 @@ async function markInTransit(id) {
  */
 async function markDelivered(id) {
   const d = await getDispatch(id);
-  if (d.status !== 'IN_TRANSIT' && d.status !== 'PENDING') {
-    throw ApiError.conflict(`Cannot mark a ${d.status} dispatch as delivered`);
+  if (d.status !== 'IN_TRANSIT') {
+    throw ApiError.conflict(`Only an IN_TRANSIT dispatch can be marked as delivered (current status: ${d.status})`);
   }
   return withTransaction(async (client) => {
     const updated = await repo.setStatus(id, 'DELIVERED', new Date().toISOString(), client);
