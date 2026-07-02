@@ -16,9 +16,24 @@ const app = express();
 
 app.set('trust proxy', 1);
 app.use(helmet());
+
+// Build the list of allowed CORS origins from env.
+// Supports comma-separated values so you can allow multiple domains:
+// FRONTEND_URL=https://textile-erp-ecru.vercel.app,https://www.textile-erp-ecru.vercel.app
+const allowedOrigins = env.frontendUrl
+  ? env.frontendUrl.split(',').map((u) => u.trim()).filter(Boolean)
+  : [];
+
 app.use(
   cors({
-    origin: env.frontendUrl,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (server-to-server, curl, Postman)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      callback(new Error(`CORS: origin ${origin} not allowed`));
+    },
     credentials: true,
   })
 );
