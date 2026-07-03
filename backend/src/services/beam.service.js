@@ -5,6 +5,10 @@ const { getPagination, buildMeta } = require('../utils/queryHelpers');
 const { withTransaction } = require('../config/db');
 
 async function listBeams(reqQuery) {
+  if (reqQuery.format) {
+    const { rows } = await repo.listBeams({ ...reqQuery, limit: undefined, offset: undefined });
+    return { items: rows };
+  }
   const { page, pageSize, offset, limit } = getPagination(reqQuery);
   const { rows, total } = await repo.listBeams({ ...reqQuery, limit, offset });
   return { items: rows, meta: buildMeta(total, page, pageSize) };
@@ -37,10 +41,11 @@ async function deleteBeam(id) {
 
 /**
  * Beam Allocation: Beam Preparation -> Beam Allocation -> Machine Assignment
- * (workflow spec). Allocating a beam to a machine must, in one transaction:
- *  - Verify beam is IN_STOCK and machine exists
- *  - Mark beam ALLOCATED and link it to the machine
- *  - Create the beam_allocations record
+ *
+ * Guards:
+ *  - Beam must be IN_STOCK
+ *  - Machine must exist and must NOT be in BREAKDOWN or MAINTENANCE state
+ *  - Machine must not already have an active beam allocation (prevents double-allocation)
  */
 async function allocateBeam(data, userId) {
   const beam = await repo.findBeamById(data.beamId);
@@ -48,8 +53,20 @@ async function allocateBeam(data, userId) {
   if (beam.status !== 'IN_STOCK') {
     throw ApiError.conflict(`Beam must be IN_STOCK to be allocated (current status: ${beam.status})`);
   }
+
   const machine = await machineRepo.findById(data.machineId);
   if (!machine) throw ApiError.notFound('Machine not found');
+  if (['BREAKDOWN', 'MAINTENANCE', 'OFFLINE'].includes(machine.status)) {
+    throw ApiError.conflict(`Cannot allocate a beam to a machine with status ${machine.status}`);
+  }
+
+  // Prevent double-allocation: check if this machine already has an active beam
+  const existingAllocation = await repo.findActiveAllocationForMachine(data.machineId);
+  if (existingAllocation) {
+    throw ApiError.conflict(
+      `Machine already has an active beam allocation (beam ${existingAllocation.beam_code}). Release it first.`
+    );
+  }
 
   return withTransaction(async (client) => {
     const allocation = await repo.createAllocation(data, userId, client);
@@ -59,6 +76,10 @@ async function allocateBeam(data, userId) {
 }
 
 async function listAllocations(reqQuery) {
+  if (reqQuery.format) {
+    const { rows } = await repo.listAllocations({ ...reqQuery, limit: undefined, offset: undefined });
+    return { items: rows };
+  }
   const { page, pageSize, offset, limit } = getPagination(reqQuery);
   const { rows, total } = await repo.listAllocations({ ...reqQuery, limit, offset });
   return { items: rows, meta: buildMeta(total, page, pageSize) };
@@ -71,8 +92,8 @@ async function getAllocation(id) {
 }
 
 /**
- * Releasing an allocation frees the beam (EMPTY if fully consumed, else
- * back to IN_STOCK) and detaches it from the machine.
+ * Releasing an allocation frees the beam back to IN_STOCK (or EMPTY if
+ * fully consumed) and clears it from the machine.
  */
 async function releaseAllocation(id, metersUsed) {
   const allocation = await getAllocation(id);
@@ -85,6 +106,7 @@ async function releaseAllocation(id, metersUsed) {
 
   return withTransaction(async (client) => {
     const released = await repo.releaseAllocation(id, metersUsed, client);
+    // Clear beam from machine and reset status
     await repo.setBeamStatus(allocation.beam_id, newStatus, null, client);
     return released;
   });

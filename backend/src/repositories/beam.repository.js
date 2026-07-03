@@ -16,11 +16,13 @@ async function listBeams({ status, search, limit, offset }) {
   const countRes = await query(`SELECT COUNT(*) FROM beams ${whereClause}`, params);
   const total = parseInt(countRes.rows[0].count, 10);
 
+  const baseQuery = `SELECT * FROM beams ${whereClause} ORDER BY created_at DESC`;
+  if (limit === undefined) {
+    const { rows } = await query(baseQuery, params);
+    return { rows, total };
+  }
   params.push(limit, offset);
-  const { rows } = await query(
-    `SELECT * FROM beams ${whereClause} ORDER BY created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
-    params
-  );
+  const { rows } = await query(`${baseQuery} LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
   return { rows, total };
 }
 
@@ -93,6 +95,16 @@ async function findActiveAllocationForBeam(beamId) {
   return rows[0] || null;
 }
 
+async function findActiveAllocationForMachine(machineId) {
+  const { rows } = await query(
+    `SELECT ba.*, b.beam_code FROM beam_allocations ba
+     JOIN beams b ON b.id = ba.beam_id
+     WHERE ba.machine_id = $1 AND ba.is_active = TRUE`,
+    [machineId]
+  );
+  return rows[0] || null;
+}
+
 async function findAllocationById(id) {
   const { rows } = await query(
     `SELECT ba.*, b.beam_code, m.name AS machine_name, m.machine_code
@@ -131,17 +143,21 @@ async function listAllocations({ machineId, beamId, activeOnly, limit, offset })
   const countRes = await query(`SELECT COUNT(*) FROM beam_allocations ba ${whereClause}`, params);
   const total = parseInt(countRes.rows[0].count, 10);
 
-  params.push(limit, offset);
-  const { rows } = await query(
-    `SELECT ba.*, b.beam_code, m.name AS machine_name, m.machine_code
+  const baseQuery = `SELECT ba.*, b.beam_code, m.name AS machine_name, m.machine_code
      FROM beam_allocations ba JOIN beams b ON b.id = ba.beam_id JOIN machines m ON m.id = ba.machine_id
-     ${whereClause} ORDER BY ba.allocated_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
-    params
-  );
+     ${whereClause} ORDER BY ba.allocated_at DESC`;
+
+  if (limit === undefined) {
+    const { rows } = await query(baseQuery, params);
+    return { rows, total };
+  }
+  params.push(limit, offset);
+  const { rows } = await query(`${baseQuery} LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
   return { rows, total };
 }
 
 module.exports = {
   listBeams, findBeamById, findBeamByCode, createBeam, updateBeam, setBeamStatus, removeBeam,
-  createAllocation, findActiveAllocationForBeam, findAllocationById, releaseAllocation, listAllocations,
+  createAllocation, findActiveAllocationForBeam, findActiveAllocationForMachine,
+  findAllocationById, releaseAllocation, listAllocations,
 };

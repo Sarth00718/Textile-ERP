@@ -76,4 +76,21 @@ async function remove(id) {
   await query('DELETE FROM work_orders WHERE id = $1', [id]);
 }
 
-module.exports = { list, findById, findByNumber, create, update, remove };
+/**
+ * Returns true if every non-CANCELLED production order under this
+ * work order is COMPLETED — used to auto-complete the work order.
+ */
+async function checkAllPOsCompleted(workOrderId, client = null) {
+  const executor = client || { query };
+  const { rows } = await executor.query(
+    `SELECT COUNT(*) AS total,
+            COUNT(*) FILTER (WHERE status = 'COMPLETED') AS completed,
+            COUNT(*) FILTER (WHERE status NOT IN ('COMPLETED','CANCELLED')) AS pending
+     FROM production_orders WHERE work_order_id = $1`,
+    [workOrderId]
+  );
+  const r = rows[0];
+  return parseInt(r.total, 10) > 0 && parseInt(r.pending, 10) === 0;
+}
+
+module.exports = { list, findById, findByNumber, create, update, remove, checkAllPOsCompleted };

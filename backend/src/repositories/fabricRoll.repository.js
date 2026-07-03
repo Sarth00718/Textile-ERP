@@ -1,7 +1,8 @@
 const { query } = require('../config/db');
 
-async function nextRollNumber() {
-  const { rows } = await query(
+async function nextRollNumber(client = null) {
+  const executor = client || { query };
+  const { rows } = await executor.query(
     `SELECT 'ROLL-' || LPAD((COALESCE(MAX(SUBSTRING(roll_no FROM 6)::INT), 0) + 1)::TEXT, 6, '0') AS next_no
      FROM fabric_rolls WHERE roll_no ~ '^ROLL-[0-9]+$'`
   );
@@ -10,7 +11,8 @@ async function nextRollNumber() {
 
 async function create(data, client) {
   const executor = client || { query };
-  const rollNo = await nextRollNumber();
+  // nextRollNumber runs INSIDE the transaction to prevent race conditions
+  const rollNo = await nextRollNumber(executor);
   const { rows } = await executor.query(
     `INSERT INTO fabric_rolls (roll_no, production_order_id, daily_production_entry_id, fabric_design_id,
        length_meters, weight_kg, status, warehouse_location)
@@ -39,15 +41,18 @@ async function list({ status, search, limit, offset }) {
   const countRes = await query(`SELECT COUNT(*) FROM fabric_rolls fr ${whereClause}`, params);
   const total = parseInt(countRes.rows[0].count, 10);
 
-  params.push(limit, offset);
-  const { rows } = await query(
-    `SELECT fr.*, fd.name AS fabric_design_name, po.production_order_no
+  const baseQuery = `SELECT fr.*, fd.name AS fabric_design_name, po.production_order_no
      FROM fabric_rolls fr
      JOIN fabric_designs fd ON fd.id = fr.fabric_design_id
      JOIN production_orders po ON po.id = fr.production_order_id
-     ${whereClause} ORDER BY fr.produced_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
-    params
-  );
+     ${whereClause} ORDER BY fr.produced_at DESC`;
+
+  if (limit === undefined) {
+    const { rows } = await query(baseQuery, params);
+    return { rows, total };
+  }
+  params.push(limit, offset);
+  const { rows } = await query(`${baseQuery} LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
   return { rows, total };
 }
 

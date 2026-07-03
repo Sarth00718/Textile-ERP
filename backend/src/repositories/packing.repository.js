@@ -54,10 +54,20 @@ async function findById(id) {
   return rows[0] || null;
 }
 
+async function findActiveByRoll(fabricRollId) {
+  const { rows } = await query(
+    `SELECT id, package_no FROM packing_records
+     WHERE fabric_roll_id = $1 AND status != 'CANCELLED'
+     LIMIT 1`,
+    [fabricRollId]
+  );
+  return rows[0] || null;
+}
+
 async function setStatus(id, status, client = null) {
   const executor = client || { query };
   const { rows } = await executor.query('UPDATE packing_records SET status = $1 WHERE id = $2 RETURNING *', [status, id]);
   return rows[0];
 }
 
-module.exports = { create, list, findById, setStatus, nextPackageNumber };
+module.exports = { create, list, findById, findActiveByRoll, setStatus, nextPackageNumber };

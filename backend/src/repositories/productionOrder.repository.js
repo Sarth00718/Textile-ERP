@@ -20,18 +20,21 @@ async function list({ status, machineId, workOrderId, limit, offset }) {
   const countRes = await query(`SELECT COUNT(*) FROM production_orders po ${whereClause}`, params);
   const total = parseInt(countRes.rows[0].count, 10);
 
-  params.push(limit, offset);
-  const { rows } = await query(
-    `SELECT po.*, m.name AS machine_name, m.machine_code, wo.work_order_no,
+  const baseQuery = `SELECT po.*, m.name AS machine_name, m.machine_code, wo.work_order_no,
             e.full_name AS operator_name, b.beam_code
      FROM production_orders po
      JOIN machines m ON m.id = po.machine_id
      JOIN work_orders wo ON wo.id = po.work_order_id
      LEFT JOIN employees e ON e.id = po.assigned_operator_id
      LEFT JOIN beams b ON b.id = po.beam_id
-     ${whereClause} ORDER BY po.created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
-    params
-  );
+     ${whereClause} ORDER BY po.created_at DESC`;
+
+  if (limit === undefined) {
+    const { rows } = await query(baseQuery, params);
+    return { rows, total };
+  }
+  params.push(limit, offset);
+  const { rows } = await query(`${baseQuery} LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
   return { rows, total };
 }
 
@@ -55,8 +58,9 @@ async function findByNumber(productionOrderNo) {
   return rows[0] || null;
 }
 
-async function create(data, userId) {
-  const { rows } = await query(
+async function create(data, userId, client = null) {
+  const executor = client || { query };
+  const { rows } = await executor.query(
     `INSERT INTO production_orders (production_order_no, work_order_id, machine_id, beam_id,
        target_quantity_meters, status, assigned_operator_id, start_date, end_date, created_by)
      VALUES ($1,$2,$3,$4,$5,'PENDING',$6,$7,$8,$9) RETURNING *`,
@@ -110,8 +114,40 @@ async function incrementProduced(id, quantityMeters, client) {
   return rows[0];
 }
 
-async function remove(id) {
-  await query('DELETE FROM production_orders WHERE id = $1', [id]);
+async function remove(id, client = null) {
+  const executor = client || { query };
+  await executor.query('DELETE FROM production_orders WHERE id = $1', [id]);
 }
 
-module.exports = { list, findById, findByNumber, create, update, incrementProduced, remove };
+/**
+ * Find any active (non-completed, non-cancelled) PO for a given machine.
+ * Used to prevent overbooking the same machine.
+ */
+async function findActiveByMachine(machineId, client = null) {
+  const executor = client || { query };
+  const { rows } = await executor.query(
+    `SELECT id, production_order_no, status FROM production_orders
+     WHERE machine_id = $1 AND status IN ('PENDING','IN_PROGRESS','ON_HOLD')
+     LIMIT 1`,
+    [machineId]
+  );
+  return rows[0] || null;
+}
+
+/**
+ * Count non-cancelled POs under a work order.
+ * Used to decide if work order should revert to PLANNED on PO deletion.
+ */
+async function countByWorkOrder(workOrderId, client = null) {
+  const executor = client || { query };
+  const { rows } = await executor.query(
+    `SELECT COUNT(*) FROM production_orders WHERE work_order_id = $1 AND status != 'CANCELLED'`,
+    [workOrderId]
+  );
+  return parseInt(rows[0].count, 10);
+}
+
+module.exports = {
+  list, findById, findByNumber, create, update, incrementProduced,
+  remove, findActiveByMachine, countByWorkOrder,
+};

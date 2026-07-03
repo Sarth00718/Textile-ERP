@@ -2,6 +2,7 @@ const repo = require('../repositories/dispatch.repository');
 const packingRepo = require('../repositories/packing.repository');
 const fabricRollRepo = require('../repositories/fabricRoll.repository');
 const salesOrderRepo = require('../repositories/salesOrder.repository');
+const workOrderRepo = require('../repositories/workOrder.repository');
 const vehicleRepo = require('../repositories/vehicle.repository');
 const { ApiError } = require('../utils/apiError');
 const { getPagination, buildMeta } = require('../utils/queryHelpers');
@@ -26,23 +27,21 @@ async function getDispatch(id) {
 }
 
 /**
- * Creating a dispatch is the culmination of the production->fulfillment
- * chain. In one transaction it must:
- *   1. Validate the sales order and every packing record (each roll must
- *      be PACKED, i.e. already QC-passed and packed).
- *   2. Create the dispatch + dispatch_items rows.
- *   3. Flip each fabric roll to DISPATCHED and each packing record to DISPATCHED.
- *   4. Roll up quantity_dispatched_meters on the relevant sales_order_items,
- *      then recompute the parent sales_order status (PARTIALLY_DISPATCHED
- *      vs DISPATCHED) -- this is "Dispatch -> Updates Sales Order".
- *   5. Mark the vehicle ON_TRIP if one was assigned.
+ * Creating a dispatch is the culmination of the production->fulfillment chain.
  *
- * Note: dispatch does NOT separately decrement inventory_items, because in
- * this schema finished-goods stock is tracked via fabric_rolls.status
- * rather than a generic inventory_items row; a DISPATCHED roll is, by
- * definition, no longer available stock. This satisfies "Dispatch ->
- * Updates Inventory" using the roll-status model rather than a duplicate
- * ledger that could drift out of sync with it.
+ * Guards:
+ *  1. Sales order must be in a dispatchable state
+ *  2. Vehicle (if supplied) must be AVAILABLE
+ *  3. Every packing record must be PACKED — not already DISPATCHED (no double-dispatch)
+ *  4. No duplicate packing records in the same dispatch request
+ *
+ * In one transaction:
+ *  - Creates dispatch + dispatch_items
+ *  - Flips rolls -> DISPATCHED, packing records -> DISPATCHED
+ *  - Updates sales_order_items.quantity_dispatched_meters
+ *  - Auto-transitions SO status (PARTIALLY_DISPATCHED / DISPATCHED)
+ *  - If SO is fully DISPATCHED and linked work order exists, auto-completes the work order
+ *  - Marks vehicle ON_TRIP
  */
 async function createDispatch(data, userId) {
   const salesOrder = await salesOrderRepo.findById(data.salesOrderId);
@@ -57,11 +56,23 @@ async function createDispatch(data, userId) {
     if (vehicle.status !== 'AVAILABLE') throw ApiError.conflict('Vehicle is not currently available');
   }
 
+  // Validate packing records and detect duplicates within same request
+  const seenPackingIds = new Set();
   const packingRecords = [];
   for (const item of data.items) {
+    if (seenPackingIds.has(item.packingRecordId)) {
+      throw ApiError.badRequest(`Packing record ${item.packingRecordId} appears more than once in this dispatch`);
+    }
+    seenPackingIds.add(item.packingRecordId);
+
     const pr = await packingRepo.findById(item.packingRecordId);
     if (!pr) throw ApiError.notFound(`Packing record ${item.packingRecordId} not found`);
-    if (pr.status !== 'PACKED') throw ApiError.conflict(`Packing record ${pr.package_no} is not in PACKED status`);
+    if (pr.status === 'DISPATCHED') {
+      throw ApiError.conflict(`Packing record ${pr.package_no} has already been dispatched`);
+    }
+    if (pr.status !== 'PACKED') {
+      throw ApiError.conflict(`Packing record ${pr.package_no} must be in PACKED status (current: ${pr.status})`);
+    }
     packingRecords.push(pr);
   }
 
@@ -69,17 +80,20 @@ async function createDispatch(data, userId) {
   const soItems = await salesOrderRepo.findItemsBySO(data.salesOrderId);
 
   const result = await withTransaction(async (client) => {
-    const dispatch = await repo.create(data, salesOrder.customer_id, totalWeight, packingRecords.length, userId, client);
+    const dispatch = await repo.create(
+      data, salesOrder.customer_id, totalWeight, packingRecords.length, userId, client
+    );
 
     const dispatchedByDesign = {};
     for (const pr of packingRecords) {
       await repo.createItem(dispatch.id, pr.id, pr.fabric_roll_id, pr.length_meters, client);
       await fabricRollRepo.setStatus(pr.fabric_roll_id, 'DISPATCHED', client);
       await packingRepo.setStatus(pr.id, 'DISPATCHED', client);
-      dispatchedByDesign[pr.fabric_design_id] = (dispatchedByDesign[pr.fabric_design_id] || 0) + Number(pr.length_meters);
+      dispatchedByDesign[pr.fabric_design_id] =
+        (dispatchedByDesign[pr.fabric_design_id] || 0) + Number(pr.length_meters);
     }
 
-    // Roll dispatched quantities up to matching sales_order_items by fabric design
+    // Update dispatched quantities on sales order items
     for (const soItem of soItems) {
       const dispatchedQty = dispatchedByDesign[soItem.fabric_design_id];
       if (dispatchedQty) {
@@ -87,11 +101,32 @@ async function createDispatch(data, userId) {
       }
     }
 
+    // Re-read to get accurate totals after increment
     const refreshedItems = await salesOrderRepo.findItemsBySO(data.salesOrderId);
-    const fullyDispatched = refreshedItems.every((i) => Number(i.quantity_dispatched_meters) >= Number(i.quantity_meters));
-    const partiallyDispatched = refreshedItems.some((i) => Number(i.quantity_dispatched_meters) > 0);
-    const newSOStatus = fullyDispatched ? 'DISPATCHED' : partiallyDispatched ? 'PARTIALLY_DISPATCHED' : salesOrder.status;
+    const fullyDispatched = refreshedItems.every(
+      (i) => Number(i.quantity_dispatched_meters) >= Number(i.quantity_meters)
+    );
+    const partiallyDispatched = refreshedItems.some(
+      (i) => Number(i.quantity_dispatched_meters) > 0
+    );
+    const newSOStatus = fullyDispatched
+      ? 'DISPATCHED'
+      : partiallyDispatched
+        ? 'PARTIALLY_DISPATCHED'
+        : salesOrder.status;
     await salesOrderRepo.updateStatus(data.salesOrderId, newSOStatus, client);
+
+    // If SO is now fully DISPATCHED and there is a linked work order,
+    // auto-complete the work order (all production is done and delivered)
+    if (fullyDispatched && salesOrder.sales_order_id) {
+      const linkedWO = await client.query(
+        `SELECT id, status FROM work_orders WHERE sales_order_id = $1 AND status NOT IN ('COMPLETED','CANCELLED')`,
+        [data.salesOrderId]
+      );
+      for (const wo of linkedWO.rows) {
+        await workOrderRepo.update(wo.id, { status: 'COMPLETED' }, client);
+      }
+    }
 
     if (data.vehicleId) {
       await vehicleRepo.setStatus(data.vehicleId, 'ON_TRIP', client);
@@ -100,7 +135,6 @@ async function createDispatch(data, userId) {
     return { ...dispatch, items: await repo.findItemsByDispatch(dispatch.id) };
   });
 
-  // Notify managers & owners of new dispatch
   await notifyRoles({
     roles: ['OWNER', 'MANAGER'],
     title: 'Dispatch Created',
@@ -116,7 +150,9 @@ async function createDispatch(data, userId) {
 
 async function markInTransit(id) {
   const d = await getDispatch(id);
-  if (d.status !== 'PENDING') throw ApiError.conflict('Only a PENDING dispatch can be marked in transit');
+  if (d.status !== 'PENDING') {
+    throw ApiError.conflict('Only a PENDING dispatch can be marked in transit');
+  }
   return repo.setStatus(id, 'IN_TRANSIT', null);
 }
 
@@ -126,8 +162,11 @@ async function markInTransit(id) {
 async function markDelivered(id) {
   const d = await getDispatch(id);
   if (d.status !== 'IN_TRANSIT') {
-    throw ApiError.conflict(`Only an IN_TRANSIT dispatch can be marked as delivered (current status: ${d.status})`);
+    throw ApiError.conflict(
+      `Only an IN_TRANSIT dispatch can be marked as delivered (current status: ${d.status})`
+    );
   }
+
   const updated = await withTransaction(async (client) => {
     const result = await repo.setStatus(id, 'DELIVERED', new Date().toISOString(), client);
     if (d.vehicle_id) {

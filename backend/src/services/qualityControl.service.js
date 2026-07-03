@@ -29,8 +29,14 @@ async function getInspection(id) {
 async function recordInspection(data) {
   const roll = await fabricRollRepo.findById(data.fabricRollId);
   if (!roll) throw ApiError.notFound('Fabric roll not found');
-  if (!['PRODUCED', 'IN_QC', 'QC_FAILED'].includes(roll.status)) {
-    throw ApiError.conflict(`Cannot record a QC inspection for a roll with status ${roll.status}`);
+
+  // Roll must be sent to QC queue first (PRODUCED -> IN_QC via fabric roll status update)
+  // before an inspection can be recorded. This enforces the correct workflow stage order.
+  if (!['IN_QC', 'QC_FAILED'].includes(roll.status)) {
+    throw ApiError.conflict(
+      `Roll must be IN_QC or QC_FAILED to record an inspection (current status: ${roll.status}). ` +
+      `Use the Fabric Rolls page to send this roll to QC first.`
+    );
   }
 
   const rollStatusMap = { PASS: 'QC_PASSED', FAIL: 'QC_FAILED', REWORK: 'IN_QC' };

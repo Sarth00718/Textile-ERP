@@ -34,6 +34,14 @@ async function createPackingRecord(data) {
     throw ApiError.conflict(`Roll must be QC_PASSED before packing (current status: ${roll.status})`);
   }
 
+  // Prevent double-packing: check if an active packing record already exists for this roll
+  const existingPack = await repo.findActiveByRoll(data.fabricRollId);
+  if (existingPack) {
+    throw ApiError.conflict(
+      `Roll ${roll.roll_no} already has a packing record (${existingPack.package_no})`
+    );
+  }
+
   const packed = await withTransaction(async (client) => {
     const record = await repo.create(data, client);
     await fabricRollRepo.setStatus(data.fabricRollId, 'PACKED', client);
